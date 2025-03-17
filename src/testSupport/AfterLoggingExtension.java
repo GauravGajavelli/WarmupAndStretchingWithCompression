@@ -6,6 +6,9 @@ import java.io.IOException;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 public class AfterLoggingExtension implements AfterAllCallback {
 
 	static private final String filepath = "src/testSupport/";
@@ -37,6 +40,14 @@ public class AfterLoggingExtension implements AfterAllCallback {
 		if (LoggingSingleton.isOperationSupported()) {
 			exportResults(LoggingSingleton.getFullMessage());
 		}
+		
+
+        File file = new File("src/testSupport/test_json.json");
+        if (!(file.exists() && !file.isDirectory())) {
+            ObjectMapper objectMapper = new ObjectMapper();
+            ObjectNode jsonNode = objectMapper.createObjectNode();
+            objectMapper.writeValue(file, jsonNode);
+        }
 	}
 
 }
