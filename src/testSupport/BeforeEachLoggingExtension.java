@@ -9,9 +9,7 @@ public class BeforeEachLoggingExtension implements BeforeEachCallback {
 	public void beforeEach(ExtensionContext arg0) throws Exception {
 //		    public static void addRunNumberToTest(String testFileName, String testName)
         // Get the test method name
-        String testName = arg0.getTestMethod()
-            .map(method -> method.getName())
-            .orElse("Unknown Method");
+        String testName = arg0.getDisplayName();
 
         // Get the test class
         Class<?> testClass = arg0.getTestClass()

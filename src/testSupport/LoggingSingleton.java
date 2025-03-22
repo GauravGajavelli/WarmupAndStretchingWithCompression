@@ -3,6 +3,7 @@ package testSupport;
 import java.io.File;
 import java.io.IOException;
 import java.sql.Timestamp;
+import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +18,8 @@ public class LoggingSingleton {
 	static private boolean operationSupported;
 	static private ObjectMapper objectMapper;
 	static private JsonNode testRunInfo;
+	static private String testFileName; // Works off of the assumption of one test running at a time
+	static private String testFilePackageName;
 	
 	// TODO Remove this/get rid of duplicates
 	static private final String filepath = "src/testSupport/";
@@ -150,6 +153,19 @@ public class LoggingSingleton {
             toRet = (ArrayNode) existingNode;
         }
         return toRet;
+    }
+    
+    public static void setCurrentTestFilePath(String testFileName, String packageName) {
+        LoggingSingleton.testFileName = testFileName;
+        LoggingSingleton.testFilePackageName = packageName;
+    }
+
+    public static String getTestFileName() {
+        return LoggingSingleton.testFileName;
+    }
+    
+    public static String getTestFilePackageName() {
+        return LoggingSingleton.testFilePackageName;
     }
 }
 
