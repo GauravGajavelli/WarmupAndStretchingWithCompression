@@ -2,6 +2,8 @@ package search;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.util.Random;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,12 +15,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import testSupport.LoggingExtension;
 import testSupport.BeforeLoggingExtension;
 import testSupport.AfterLoggingExtension;
+import testSupport.BeforeEachLoggingExtension;
 
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @ExtendWith(BeforeLoggingExtension.class)
 @ExtendWith(LoggingExtension.class)
 @ExtendWith(AfterLoggingExtension.class)
+@ExtendWith(BeforeEachLoggingExtension.class)
+
 public class EfficientSearchTest {
 
 	private int[] smallArray; 

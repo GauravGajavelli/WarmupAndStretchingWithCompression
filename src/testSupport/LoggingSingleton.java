@@ -6,6 +6,7 @@ import java.sql.Timestamp;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class LoggingSingleton {
@@ -98,6 +99,57 @@ public class LoggingSingleton {
     
     public static JsonNode getTestRunInfo() {
     	return testRunInfo;
+    }
+    
+    public static void incrementRunNumber() {
+    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
+        int prevRunNumber = incremented.get("prevRunNumber").asInt();
+
+        // Increment
+        incremented.put("prevRunNumber", prevRunNumber + 1);
+    	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
+    }
+    
+    
+    public static void addRunNumberToTest(String testFileName, String testName) {
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+        int currentRunNumber = added.get("prevRunNumber").asInt(); // it's already incremented, presumably
+        
+        ObjectNode testFileNameNode = getOrCreateObjectNode(added, testFileName);
+        ArrayNode testNameArray = getOrCreateArrayNode(testFileNameNode, testName);
+        testNameArray.add(currentRunNumber);
+        
+    	LoggingSingleton.testRunInfo = ((JsonNode)(added));
+    }
+    
+    public static ObjectNode getOrCreateObjectNode(ObjectNode parent, String nodeName) {
+        JsonNode existingNode = parent.get(nodeName);
+        ObjectNode toRet;
+        
+        // get/create the test file node
+        if (existingNode == null) {
+            // Create it if missing
+            toRet = objectMapper.createObjectNode();
+            parent.set(nodeName, toRet);
+        } else {
+            toRet = (ObjectNode) existingNode;
+        }
+        return toRet;
+    }
+    
+    public static ArrayNode getOrCreateArrayNode(ObjectNode parent, String nodeName) {
+        JsonNode existingNode = parent.get(nodeName);
+        ArrayNode toRet;
+        
+        // get/create the test file node
+        if (existingNode == null) {
+            // Create it if missing
+            toRet = objectMapper.createArrayNode();
+            parent.set(nodeName, toRet);
+        } else {
+            toRet = (ArrayNode) existingNode;
+        }
+        return toRet;
     }
 }
 

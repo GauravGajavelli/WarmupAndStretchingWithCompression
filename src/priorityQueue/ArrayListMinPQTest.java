@@ -9,6 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import testSupport.LoggingExtension;
 import testSupport.BeforeLoggingExtension;
 import testSupport.AfterLoggingExtension;
+import testSupport.BeforeEachLoggingExtension;
 
 /**
  * Test cases.
@@ -18,6 +19,7 @@ import testSupport.AfterLoggingExtension;
 @ExtendWith(BeforeLoggingExtension.class)
 @ExtendWith(LoggingExtension.class)
 @ExtendWith(AfterLoggingExtension.class)
+@ExtendWith(BeforeEachLoggingExtension.class)
 public class ArrayListMinPQTest {
 
 	private static int points = 0; 

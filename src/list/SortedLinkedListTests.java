@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import testSupport.LoggingExtension;
 import testSupport.BeforeLoggingExtension;
 import testSupport.AfterLoggingExtension;
+import testSupport.BeforeEachLoggingExtension;
 
 /**
  * Tests {@link SortedLinkedList}.
@@ -14,6 +15,7 @@ import testSupport.AfterLoggingExtension;
 @ExtendWith(BeforeLoggingExtension.class)
 @ExtendWith(LoggingExtension.class)
 @ExtendWith(AfterLoggingExtension.class)
+@ExtendWith(BeforeEachLoggingExtension.class)
 public class SortedLinkedListTests {
 
 	private static int points = 0;
