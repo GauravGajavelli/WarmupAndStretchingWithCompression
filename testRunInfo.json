@@ -1,58 +1,58 @@
 {
   "schema_version" : 1.0,
-  "prevRunNumber" : 10,
+  "prevRunNumber" : 4,
   "EfficientSearchTest" : {
-    "testBinarySearchAllArrayElements" : [ 7, 8, 9, 10 ],
-    "testBinarySearchFirstMid" : [ 7, 8, 9, 10 ],
-    "testBinarySearchItemNotInArray" : [ 7, 8, 9, 10 ],
-    "testBinarySearchSecondMid" : [ 7, 8, 9, 10 ],
-    "testBinarySearchSecondMid2" : [ 7, 8, 9, 10 ],
-    "zzzTestBinarySearchEfficiency" : [ 7, 8, 9, 10 ]
+    "testBinarySearchAllArrayElements()" : [ 0, 2, 3, 4 ],
+    "testBinarySearchFirstMid()" : [ 0, 2, 3, 4 ],
+    "testBinarySearchItemNotInArray()" : [ 0, 2, 3, 4 ],
+    "testBinarySearchSecondMid()" : [ 0, 2, 3, 4 ],
+    "testBinarySearchSecondMid2()" : [ 0, 2, 3, 4 ],
+    "zzzTestBinarySearchEfficiency()" : [ 0, 2, 3, 4 ]
   },
   "AnagramTests" : {
-    "testAnagram1" : [ 5, 8, 9, 10 ],
-    "testAnagram2" : [ 5, 8, 9, 10 ],
-    "testAnagram3" : [ 5, 8, 9, 10 ],
-    "testAnagram4" : [ 5, 8, 9, 10 ],
-    "testAnagram5" : [ 5, 8, 9, 10 ],
-    "testAnagram6" : [ 5, 8, 9, 10 ],
-    "testAnagram7" : [ 5, 8, 9, 10 ]
-  },
-  "NGramCountingTests" : {
-    "testUnigramCounting" : [ 5, 8, 9, 10 ],
-    "testBigramCounting" : [ 5, 8, 9, 10 ],
-    "testTrigramCounting" : [ 5, 8, 9, 10 ],
-    "testNGramCountingFrequencyAnalysis" : [ 5, 8, 9, 10 ]
-  },
-  "EuclidTest" : {
-    "testWorstCaseRuntime" : [ 5, 8, 9, 10 ],
-    "testBasic" : [ 5, 8, 9, 10 ],
-    "testLargePrimeGcd" : [ 5, 8, 9, 10 ],
-    "testLargeGcd" : [ 5, 8, 9, 10 ],
-    "testReversed" : [ 5, 8, 9, 10 ]
-  },
-  "SortedLinkedListTests" : {
-    "testAdd1" : [ 5, 8, 9, 10 ],
-    "testAdd2" : [ 5, 8, 9, 10 ],
-    "testAdd3" : [ 5, 8, 9, 10 ],
-    "testListConstructor" : [ 5, 8, 9, 10 ],
-    "testConstructor" : [ 5, 8, 9, 10 ]
-  },
-  "ArrayListMinPQTest" : {
-    "testFindMin" : [ 5, 8, 9, 10 ],
-    "testClear" : [ 5, 8, 9, 10 ],
-    "testFindMinStrings" : [ 5, 8, 9, 10 ],
-    "testFindMinEmpty" : [ 5, 8, 9, 10 ],
-    "testRemoveMinEmpty" : [ 5, 8, 9, 10 ],
-    "testInsertAndSize" : [ 5, 8, 9, 10 ],
-    "testIsEmpty" : [ 5, 8, 9, 10 ],
-    "testRemoveMinStrings" : [ 5, 8, 9, 10 ],
-    "testRemoveMin" : [ 5, 8, 9, 10 ]
+    "testAnagram1()" : [ 0, 2, 4 ],
+    "testAnagram2()" : [ 0, 2, 4 ],
+    "testAnagram3()" : [ 0, 2, 4 ],
+    "testAnagram4()" : [ 0, 2, 4 ],
+    "testAnagram5()" : [ 0, 2, 4 ],
+    "testAnagram6()" : [ 0, 2, 4 ],
+    "testAnagram7()" : [ 0, 2, 4 ]
   },
   "ShapeTest" : {
-    "testSortTrianglesByAreaUsingTreeSet" : [ 10 ],
-    "testSortTrianglesByPerimeter" : [ 10 ],
-    "testSortTrianglesByArea" : [ 10 ],
-    "testSortCircles" : [ 10 ]
+    "testSortTrianglesByAreaUsingTreeSet()" : [ 0, 2, 4 ],
+    "testSortTrianglesByPerimeter()" : [ 0, 1, 2, 4 ],
+    "testSortTrianglesByArea()" : [ 0, 2, 4 ],
+    "testSortCircles()" : [ 0, 2, 4 ]
+  },
+  "NGramCountingTests" : {
+    "testUnigramCounting()" : [ 0, 2, 4 ],
+    "testBigramCounting()" : [ 0, 2, 4 ],
+    "testTrigramCounting()" : [ 0, 2, 4 ],
+    "testNGramCountingFrequencyAnalysis()" : [ 0, 2, 4 ]
+  },
+  "EuclidTest" : {
+    "testWorstCaseRuntime()" : [ 0, 2, 4 ],
+    "testBasic()" : [ 0, 2, 4 ],
+    "testLargePrimeGcd()" : [ 0, 2, 4 ],
+    "testLargeGcd()" : [ 0, 2, 4 ],
+    "testReversed()" : [ 0, 2, 4 ]
+  },
+  "SortedLinkedListTests" : {
+    "testAdd1()" : [ 0, 2, 4 ],
+    "testAdd2()" : [ 0, 2, 4 ],
+    "testAdd3()" : [ 0, 2, 4 ],
+    "testListConstructor()" : [ 0, 2, 4 ],
+    "testConstructor()" : [ 0, 2, 4 ]
+  },
+  "ArrayListMinPQTest" : {
+    "testFindMin()" : [ 0, 2, 4 ],
+    "testClear()" : [ 0, 2, 4 ],
+    "testFindMinStrings()" : [ 0, 2, 4 ],
+    "testFindMinEmpty()" : [ 0, 2, 4 ],
+    "testRemoveMinEmpty()" : [ 0, 2, 4 ],
+    "testInsertAndSize()" : [ 0, 2, 4 ],
+    "testIsEmpty()" : [ 0, 2, 4 ],
+    "testRemoveMinStrings()" : [ 0, 2, 4 ],
+    "testRemoveMin()" : [ 0, 2, 4 ]
   }
 }

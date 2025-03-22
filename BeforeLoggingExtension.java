@@ -17,6 +17,12 @@ public class BeforeLoggingExtension implements BeforeAllCallback {
 			LoggingSingleton.incrementRunNumber();
 			incremented = true;
 		}
+		
+		Class<?> testClass = arg0.getTestClass().orElseThrow();
+        String testFileName = testClass.getSimpleName();
+        String packageName = testClass.getPackageName();
+        
+        LoggingSingleton.setCurrentTestFilePath(testFileName, packageName);
 	}
 
 }
