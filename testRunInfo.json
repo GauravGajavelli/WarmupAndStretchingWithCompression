@@ -1,4 +1,58 @@
 {
   "schema_version" : 1.0,
-  "prevRunNumber" : -1
+  "prevRunNumber" : 10,
+  "EfficientSearchTest" : {
+    "testBinarySearchAllArrayElements" : [ 7, 8, 9, 10 ],
+    "testBinarySearchFirstMid" : [ 7, 8, 9, 10 ],
+    "testBinarySearchItemNotInArray" : [ 7, 8, 9, 10 ],
+    "testBinarySearchSecondMid" : [ 7, 8, 9, 10 ],
+    "testBinarySearchSecondMid2" : [ 7, 8, 9, 10 ],
+    "zzzTestBinarySearchEfficiency" : [ 7, 8, 9, 10 ]
+  },
+  "AnagramTests" : {
+    "testAnagram1" : [ 5, 8, 9, 10 ],
+    "testAnagram2" : [ 5, 8, 9, 10 ],
+    "testAnagram3" : [ 5, 8, 9, 10 ],
+    "testAnagram4" : [ 5, 8, 9, 10 ],
+    "testAnagram5" : [ 5, 8, 9, 10 ],
+    "testAnagram6" : [ 5, 8, 9, 10 ],
+    "testAnagram7" : [ 5, 8, 9, 10 ]
+  },
+  "NGramCountingTests" : {
+    "testUnigramCounting" : [ 5, 8, 9, 10 ],
+    "testBigramCounting" : [ 5, 8, 9, 10 ],
+    "testTrigramCounting" : [ 5, 8, 9, 10 ],
+    "testNGramCountingFrequencyAnalysis" : [ 5, 8, 9, 10 ]
+  },
+  "EuclidTest" : {
+    "testWorstCaseRuntime" : [ 5, 8, 9, 10 ],
+    "testBasic" : [ 5, 8, 9, 10 ],
+    "testLargePrimeGcd" : [ 5, 8, 9, 10 ],
+    "testLargeGcd" : [ 5, 8, 9, 10 ],
+    "testReversed" : [ 5, 8, 9, 10 ]
+  },
+  "SortedLinkedListTests" : {
+    "testAdd1" : [ 5, 8, 9, 10 ],
+    "testAdd2" : [ 5, 8, 9, 10 ],
+    "testAdd3" : [ 5, 8, 9, 10 ],
+    "testListConstructor" : [ 5, 8, 9, 10 ],
+    "testConstructor" : [ 5, 8, 9, 10 ]
+  },
+  "ArrayListMinPQTest" : {
+    "testFindMin" : [ 5, 8, 9, 10 ],
+    "testClear" : [ 5, 8, 9, 10 ],
+    "testFindMinStrings" : [ 5, 8, 9, 10 ],
+    "testFindMinEmpty" : [ 5, 8, 9, 10 ],
+    "testRemoveMinEmpty" : [ 5, 8, 9, 10 ],
+    "testInsertAndSize" : [ 5, 8, 9, 10 ],
+    "testIsEmpty" : [ 5, 8, 9, 10 ],
+    "testRemoveMinStrings" : [ 5, 8, 9, 10 ],
+    "testRemoveMin" : [ 5, 8, 9, 10 ]
+  },
+  "ShapeTest" : {
+    "testSortTrianglesByAreaUsingTreeSet" : [ 10 ],
+    "testSortTrianglesByPerimeter" : [ 10 ],
+    "testSortTrianglesByArea" : [ 10 ],
+    "testSortCircles" : [ 10 ]
+  }
 }
