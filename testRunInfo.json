@@ -1,5 +1,4 @@
 {
-    "schema_version": 1.0,
-    "currentRunNumber": 0,
-    "writesInProgress": false
+  "schema_version" : 1.0,
+  "prevRunNumber" : -1
 }
