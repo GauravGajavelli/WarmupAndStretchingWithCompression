@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -13,14 +15,87 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.github.difflib.DiffUtils;
+import com.github.difflib.algorithm.DiffException;
+import com.github.difflib.patch.AbstractDelta;
+import com.github.difflib.patch.Patch;
 
 public class AfterLoggingExtension implements AfterAllCallback {
 
 	static private final String filepath = "src/testSupport/";
 	static private final String csvFilename = "supportData.csv";
 	static private final String testRunInfoFilename = "testRunInfo.json";
+	static private final boolean sourceDiffsWritten = false;
+	
+	private String buildDiffOutputString(List<AbstractDelta<String>> deltas, int testRunNumber) {
+		StringBuilder toRet = new StringBuilder();
+		 // similar to encode/decode string; number of diffs and a delimiter
+		toRet.append(deltas.size());
+		toRet.append(";\n");
+		for (int i = 0; i < deltas.size(); i++) {
+			AbstractDelta<String> delta = deltas.get(i);
+            toRet.append(delta.getType());
+    		toRet.append("\n");
 
-	private void exportResults(String outputString, ObjectMapper objectMapper, JsonNode testRunInfo, String testFileName, String packageName) {
+            List<String> sourceLines = delta.getSource().getLines();
+    		toRet.append(sourceLines.size());
+    		toRet.append(",\n");
+    		for (String sourceLine:sourceLines) {
+    			toRet.append(sourceLine);
+        		toRet.append("\n");
+    		}
+    		
+            List<String> targetLines = delta.getTarget().getLines();
+    		toRet.append(targetLines.size());
+    		toRet.append(",\n");
+    		for (String targetLine:targetLines) {
+    			toRet.append(targetLine);
+        		toRet.append("\n");
+    		}
+		}
+		return toRet.toString();
+	}
+	
+	private void addDiffedFile(String testFileName, String packageName, Path revisedPath, Path sourcePath, int testRunNumber) {
+		// Create this path if it didn't exist: testSupport/diffs/patches/filename
+		String toWritePath = filepath + "diffs/patches/" + packageName + "." + testFileName + "_" + testRunNumber;
+		File myObj = new File(toWritePath);
+		try {
+			// Read in the files
+	        List<String> original = Files.readAllLines(sourcePath);
+	        List<String> revised = Files.readAllLines(revisedPath);
+	
+	        // Compute the diff: original -> revised
+	        Patch<String> patch = new Patch<>();
+			try {
+				patch = DiffUtils.diff(original, revised);
+			} catch (DiffException e) {
+				e.printStackTrace();
+			}
+			
+			// Write diffs
+			List<AbstractDelta<String>> deltas = patch.getDeltas();
+			if (deltas == null || deltas.size() == 0) {
+				return;
+			}
+			
+			// Create output file/directories if it doesn't exist
+	        File parentDir = myObj.getParentFile();
+	        if (parentDir != null && !parentDir.exists()) {
+	            parentDir.mkdirs(); // Creates all necessary subdirs
+	        }
+			myObj.createNewFile();
+	        
+			FileOutputStream fos = new FileOutputStream(toWritePath, true);
+			fos.write(buildDiffOutputString(deltas, testRunNumber).getBytes());
+			fos.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void exportResults(String outputString, ObjectMapper objectMapper, JsonNode testRunInfo, String testFileName, String packageName, int testRunNumber) {
 		try {
 			// Create file only if it doesn't exist
 			File myObj = new File(filepath + csvFilename);
@@ -38,21 +113,13 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	        File testRunInfoFile = new File(filepath + testRunInfoFilename);
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(testRunInfoFile, testRunInfo);
             
-            String testFilePath =  "src/" + packageName.replace('.', '/') + "/" + testFileName + ".java";
-            String baselineFilePath = filepath + "diffs/baselines/" + testFileName;
+            Path testFilePath =  Paths.get("src/" + packageName.replace('.', '/') + "/" + testFileName + ".java");
+            Path testBaselineFilePath = Paths.get(filepath + "diffs/baselines/" + packageName + "." + testFileName);
             
-            File baselineFile = new File(baselineFilePath);
-            if (baselineFile.exists()) { // the file already exists, diff it
-            	// TODO implement diffing
+            if (Files.exists(testBaselineFilePath)) { // the file already exists, diff it
+            	addDiffedFile(testFileName, packageName, testFilePath, testBaselineFilePath, testRunNumber);
             } else {
-                Path sourcePath = Paths.get(testFilePath);
-                Path targetPath = Paths.get(baselineFilePath);
-
-                try {
-                    Files.copy(sourcePath, targetPath);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                Files.copy(testFilePath, testBaselineFilePath);                
             }
 		} catch (IOException e) {
 			System.err.println("Could not create supportData.csv file - Ignore this error");
@@ -67,7 +134,8 @@ public class AfterLoggingExtension implements AfterAllCallback {
 						  LoggingSingleton.getObjectMapper(),
 						  LoggingSingleton.getTestRunInfo(),
 						  LoggingSingleton.getTestFileName(),
-						  LoggingSingleton.getTestFilePackageName());
+						  LoggingSingleton.getTestFilePackageName(),
+						  LoggingSingleton.getCurrentTestRunNumber());
 		}
 	}
 

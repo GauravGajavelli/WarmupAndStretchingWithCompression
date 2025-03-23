@@ -113,6 +113,12 @@ public class LoggingSingleton {
     	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
     }
     
+    public static int getCurrentTestRunNumber() {
+    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
+        int prevRunNumber = incremented.get("prevRunNumber").asInt();
+        return prevRunNumber;
+    }
+    
     
     public static void addRunNumberToTest(String testFileName, String testName) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
