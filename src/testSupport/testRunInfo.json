@@ -1,58 +1,58 @@
 {
   "schema_version" : 1.0,
-  "prevRunNumber" : 4,
+  "prevRunNumber" : 21,
   "EfficientSearchTest" : {
-    "testBinarySearchAllArrayElements()" : [ 0, 2, 3, 4 ],
-    "testBinarySearchFirstMid()" : [ 0, 2, 3, 4 ],
-    "testBinarySearchItemNotInArray()" : [ 0, 2, 3, 4 ],
-    "testBinarySearchSecondMid()" : [ 0, 2, 3, 4 ],
-    "testBinarySearchSecondMid2()" : [ 0, 2, 3, 4 ],
-    "zzzTestBinarySearchEfficiency()" : [ 0, 2, 3, 4 ]
+    "testBinarySearchAllArrayElements()" : [ 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testBinarySearchFirstMid()" : [ 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testBinarySearchItemNotInArray()" : [ 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testBinarySearchSecondMid()" : [ 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testBinarySearchSecondMid2()" : [ 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "zzzTestBinarySearchEfficiency()" : [ 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18, 19, 21 ]
   },
   "AnagramTests" : {
-    "testAnagram1()" : [ 0, 2, 4 ],
-    "testAnagram2()" : [ 0, 2, 4 ],
-    "testAnagram3()" : [ 0, 2, 4 ],
-    "testAnagram4()" : [ 0, 2, 4 ],
-    "testAnagram5()" : [ 0, 2, 4 ],
-    "testAnagram6()" : [ 0, 2, 4 ],
-    "testAnagram7()" : [ 0, 2, 4 ]
+    "testAnagram1()" : [ 0, 2, 4, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 ],
+    "testAnagram2()" : [ 0, 2, 4, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 ],
+    "testAnagram3()" : [ 0, 2, 4, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 ],
+    "testAnagram4()" : [ 0, 2, 4, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 ],
+    "testAnagram5()" : [ 0, 2, 4, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 ],
+    "testAnagram6()" : [ 0, 2, 4, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 ],
+    "testAnagram7()" : [ 0, 2, 4, 5, 6, 7, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 ]
   },
   "ShapeTest" : {
-    "testSortTrianglesByAreaUsingTreeSet()" : [ 0, 2, 4 ],
-    "testSortTrianglesByPerimeter()" : [ 0, 1, 2, 4 ],
-    "testSortTrianglesByArea()" : [ 0, 2, 4 ],
-    "testSortCircles()" : [ 0, 2, 4 ]
+    "testSortTrianglesByAreaUsingTreeSet()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testSortTrianglesByPerimeter()" : [ 0, 1, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testSortTrianglesByArea()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testSortCircles()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ]
   },
   "NGramCountingTests" : {
-    "testUnigramCounting()" : [ 0, 2, 4 ],
-    "testBigramCounting()" : [ 0, 2, 4 ],
-    "testTrigramCounting()" : [ 0, 2, 4 ],
-    "testNGramCountingFrequencyAnalysis()" : [ 0, 2, 4 ]
+    "testUnigramCounting()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testBigramCounting()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testTrigramCounting()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testNGramCountingFrequencyAnalysis()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ]
   },
   "EuclidTest" : {
-    "testWorstCaseRuntime()" : [ 0, 2, 4 ],
-    "testBasic()" : [ 0, 2, 4 ],
-    "testLargePrimeGcd()" : [ 0, 2, 4 ],
-    "testLargeGcd()" : [ 0, 2, 4 ],
-    "testReversed()" : [ 0, 2, 4 ]
+    "testWorstCaseRuntime()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testBasic()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testLargePrimeGcd()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testLargeGcd()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testReversed()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ]
   },
   "SortedLinkedListTests" : {
-    "testAdd1()" : [ 0, 2, 4 ],
-    "testAdd2()" : [ 0, 2, 4 ],
-    "testAdd3()" : [ 0, 2, 4 ],
-    "testListConstructor()" : [ 0, 2, 4 ],
-    "testConstructor()" : [ 0, 2, 4 ]
+    "testAdd1()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testAdd2()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testAdd3()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testListConstructor()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testConstructor()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ]
   },
   "ArrayListMinPQTest" : {
-    "testFindMin()" : [ 0, 2, 4 ],
-    "testClear()" : [ 0, 2, 4 ],
-    "testFindMinStrings()" : [ 0, 2, 4 ],
-    "testFindMinEmpty()" : [ 0, 2, 4 ],
-    "testRemoveMinEmpty()" : [ 0, 2, 4 ],
-    "testInsertAndSize()" : [ 0, 2, 4 ],
-    "testIsEmpty()" : [ 0, 2, 4 ],
-    "testRemoveMinStrings()" : [ 0, 2, 4 ],
-    "testRemoveMin()" : [ 0, 2, 4 ]
+    "testFindMin()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testClear()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testFindMinStrings()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testFindMinEmpty()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testRemoveMinEmpty()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testInsertAndSize()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testIsEmpty()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testRemoveMinStrings()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ],
+    "testRemoveMin()" : [ 0, 2, 4, 5, 6, 7, 11, 13, 14, 15, 16, 17, 18, 19, 21 ]
   }
 }

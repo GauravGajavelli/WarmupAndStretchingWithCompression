@@ -4,6 +4,25 @@ public class EfficientSearch {
 	
 	private static int bSearch(int[] sortedArray, int first, int last, int searchTerm) {
 
+//		if (first > last) {
+//			// base case - not found
+//			return -1;
+//		} else {
+//			int midPoint = first + (last - first) / 2;
+//			if (searchTerm == sortedArray[midPoint]) {
+//				// base case - found
+//				return midPoint;
+//			} else {
+//				// non-base case
+//				if (searchTerm < sortedArray[midPoint]) {
+//					last = midPoint - 1;
+//				} else {
+//					first = midPoint + 1;
+//				}
+//				return bSearch(sortedArray, first, last, searchTerm);
+//			}
+//		}
+		
 		if (first > last) {
 			// base case - not found
 			return -1;

@@ -13,7 +13,7 @@ import testSupport.BeforeEachLoggingExtension;
 /**
  * Tests Anagram.
  * 
- * @author Claude Anderson.
+ * @author Testy Testerson.
  */
 
 @ExtendWith(BeforeLoggingExtension.class)
