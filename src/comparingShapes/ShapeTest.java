@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.TreeSet;
+
+import org.junit.AfterClass;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,11 +43,6 @@ public class ShapeTest {
 		System.out.println("Before sorting circles: ");
 		printArray(circles);
 
-		// TODO: Nothing to change here. But note,
-		// there is only one way to sort circles, since sorting by
-		// radius, perimeter, or area will always give the same results.
-		// To make this code run without crashing, make the Circle class
-		// Comparable (that is, change the Circle class)
 		System.out.println("After sorting circles: ");
 		Arrays.sort(circles);
 		printArray(circles);
@@ -72,16 +69,11 @@ public class ShapeTest {
 		printArray(triangles);
 
 		System.out.println("After sorting triangles by perimeter: ");
-		// TODO: Nothing to write here. Just study this example. Note that we
-		// can sort triangles by perimeter or area, so it isn't enough to make
-		// triangles implement Comparable. For maximum flexibility, we write and
-		// pass Comparator objects to the sort() method to compare triangles by
-		// perimeter and by area.
+
 		Comparator<Triangle> byPerimeter = new Comparator<Triangle>() {
 			@Override
 			public int compare(Triangle first, Triangle second) {
-				return (int) Math
-						.signum(first.perimeter() - second.perimeter());
+				return (int) Math.signum(first.perimeter() - second.perimeter());
 			}
 		};
 		Arrays.sort(triangles, byPerimeter);
@@ -108,10 +100,11 @@ public class ShapeTest {
 		printArray(triangles);
 
 		System.out.println("After sorting triangles by area: ");
-		// TODO: Create and add a comparator to compare triangles by area,
+		// A comparator to compare triangles by area,
 		// so we can sort by area. Then pass it as a second argument to the
 		// sort method.
-		Arrays.sort(triangles);
+		Comparator<Triangle> byArea = new TriangleAreaComparator();
+		Arrays.sort(triangles, byArea);
 		printArray(triangles);
 		assertEquals(t4, triangles[0]);
 		assertEquals(t2, triangles[1]);
@@ -142,26 +135,33 @@ public class ShapeTest {
 		// The purpose of this part is to get experience with TreeSets, their
 		// methods, and iterating with foreach.
 		// Do this as follows:
-		// TODO: 1 Modify the next line to create a new TreeSet - use the version
-		// of the constructor that takes a
-		// comparator, and pass the same comparator you wrote for the last test.
-		TreeSet<Triangle> triangleSet = null;
 
-		// TODO: 2 Iterate through the unsorted triangles array, adding the
+		// comparator, and pass the same comparator you wrote for the last test.
+		TreeSet<Triangle> triangleSet = new TreeSet<Triangle>(new TriangleAreaComparator());
+
+		// Iterate through the unsorted triangles array, adding the
 		// triangles
 		// to the TreeSet.
+		for (int i = 0; i < triangles.length; i++) {
+			triangleSet.add(triangles[i]);
+		}
 
-		// TODO: 3 Iterate through the TreeSet using a foreach loop (Java's
-		// "enhanced" for loop) and output them. For an example of the foreach
+		// Iterates through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and outputs them. For an example of the foreach
 		// loop, see the assert tests later in this test.
-		// Format this like the printArray function. But since you don't have an
+		// Formatted like the printArray function. But since you don't have an
 		// array index to check for the last element, I'll let you keep the
 		// extra comma+space.
-		// Challenge: You could get rid of the last character though: remember a
-		// nice string method to do this?
 
-		
-		
+		StringBuilder sb = new StringBuilder();
+		sb.append("[");
+		for (Triangle t : triangleSet) {
+			sb.append(t);
+			sb.append(", ");
+		}
+		sb.append("]\n");
+		System.out.println(sb.toString());
+
 		// Note: the next line also prints the triangle set nicely - go,
 		// built-in methods! Compare with your results.
 		// System.out.println(triangleSet);
@@ -175,9 +175,10 @@ public class ShapeTest {
 			assertEquals(expectedOrder[i], t);
 			i++;
 		}
-		// Thanks for continuing to read. The foreach loop is just shorthand for using an iterator:
+		// Thanks for continuing to read. The foreach loop is just shorthand for using
+		// an iterator:
 		i = 0;
-		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext(); ) {
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext();) {
 			Triangle t = iter.next();
 			assertEquals(expectedOrder[i], t);
 			i++;
@@ -185,7 +186,7 @@ public class ShapeTest {
 		points += 4;
 	}
 
-	@AfterAll
+	@AfterClass
 	public static void showPoints() {
 		System.out.printf("COMPARING SHAPES POINTS = %d of 10\n", points);
 	}

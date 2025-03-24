@@ -3,9 +3,12 @@ package testSupport;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +28,8 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	static private final String filepath = "src/testSupport/";
 	static private final String csvFilename = "supportData.csv";
 	static private final String testRunInfoFilename = "testRunInfo.json";
-	static private final boolean sourceDiffsWritten = false;
+	
+	static boolean diffsWritten = false;
 	
 	private String buildDiffOutputString(List<AbstractDelta<String>> deltas, int testRunNumber) {
 		StringBuilder toRet = new StringBuilder();
@@ -56,9 +60,9 @@ public class AfterLoggingExtension implements AfterAllCallback {
 		return toRet.toString();
 	}
 	
-	private void addDiffedFile(String testFileName, String packageName, Path revisedPath, Path sourcePath, int testRunNumber) {
+	private void addDiffedFile(String fileName, String packageName, Path revisedPath, Path sourcePath, int testRunNumber) {
 		// Create this path if it didn't exist: testSupport/diffs/patches/filename
-		String toWritePath = filepath + "diffs/patches/" + packageName + "." + testFileName + "_" + testRunNumber;
+		String toWritePath = filepath + "diffs/patches/" + packageName + "." + fileName + "_" + testRunNumber;
 		File myObj = new File(toWritePath);
 		try {
 			// Read in the files
@@ -94,8 +98,52 @@ public class AfterLoggingExtension implements AfterAllCallback {
 			e.printStackTrace();
 		}
 	}
+	
+	private void writeDiffs(int testRunNumber) {
+        Path sourceFolder = Paths.get("src/");
+        try {
+			Files.walkFileTree(sourceFolder, new SimpleFileVisitor<Path>() {
+			    @Override
+			    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+			        String fileName = file.getFileName().toString();
+			    	if (fileName.endsWith(".java")) {
 
-	private void exportResults(String outputString, ObjectMapper objectMapper, JsonNode testRunInfo, String testFileName, String packageName, int testRunNumber) {
+			            // We get what's past sourceFolder to String length in the file path, and then separate out the file name at the end
+			            String sourceFolderPath = Paths.get("src/").toString();
+			            String packageAndFileName = file.toString().substring(sourceFolderPath.length()+1);
+			            String packageName = packageAndFileName.substring(0,packageAndFileName.length()-fileName.length()-1);
+			            String fileNameNoJava = fileName.substring(0,fileName.length()-".java".length());
+			            Path baselineFilePath = Paths.get(filepath + "diffs/baselines/" + packageName.replace('/', '.') + "." + fileNameNoJava);
+			            
+			            if (Files.exists(baselineFilePath)) { // the file already exists, diff it
+			            	addDiffedFile(fileNameNoJava, packageName, file, baselineFilePath, testRunNumber);
+			            } else {
+			                try {
+								Files.copy(file, baselineFilePath);
+							} catch (IOException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}                
+			            }
+			        }
+			        return FileVisitResult.CONTINUE;
+			    }
+
+			    @Override
+			    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+			        if (dir.getFileName().toString().equals("testSupport")) {
+			            return FileVisitResult.SKIP_SUBTREE;
+			        }
+			        return FileVisitResult.CONTINUE;
+			    }
+			});
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void exportResults(String outputString, ObjectMapper objectMapper, JsonNode testRunInfo) {
 		try {
 			// Create file only if it doesn't exist
 			File myObj = new File(filepath + csvFilename);
@@ -112,15 +160,6 @@ public class AfterLoggingExtension implements AfterAllCallback {
 			
 	        File testRunInfoFile = new File(filepath + testRunInfoFilename);
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(testRunInfoFile, testRunInfo);
-            
-            Path testFilePath =  Paths.get("src/" + packageName.replace('.', '/') + "/" + testFileName + ".java");
-            Path testBaselineFilePath = Paths.get(filepath + "diffs/baselines/" + packageName + "." + testFileName);
-            
-            if (Files.exists(testBaselineFilePath)) { // the file already exists, diff it
-            	addDiffedFile(testFileName, packageName, testFilePath, testBaselineFilePath, testRunNumber);
-            } else {
-                Files.copy(testFilePath, testBaselineFilePath);                
-            }
 		} catch (IOException e) {
 			System.err.println("Could not create supportData.csv file - Ignore this error");
 		}
@@ -128,14 +167,16 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	
 	@Override
 	public void afterAll(ExtensionContext arg0) throws Exception {
+		if (!diffsWritten) {
+			writeDiffs(LoggingSingleton.getCurrentTestRunNumber());
+			diffsWritten = true;
+		}
+		
 		LoggingSingleton.addTimeStamp();
 		if (LoggingSingleton.isOperationSupported()) {
 			exportResults(LoggingSingleton.getFullMessage(),
 						  LoggingSingleton.getObjectMapper(),
-						  LoggingSingleton.getTestRunInfo(),
-						  LoggingSingleton.getTestFileName(),
-						  LoggingSingleton.getTestFilePackageName(),
-						  LoggingSingleton.getCurrentTestRunNumber());
+						  LoggingSingleton.getTestRunInfo());
 		}
 	}
 
