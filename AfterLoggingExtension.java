@@ -173,7 +173,6 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	
 	@Override
 	public void afterAll(ExtensionContext arg0) throws Exception {
-		System.out.println("\n\ntranspiration: "+LoggingSingleton.getCurrentTestRunNumber()+ "\n\n");
 		if (!diffsWritten) {
 			writeDiffs(LoggingSingleton.getCurrentTestRunNumber());
 			diffsWritten = true;
