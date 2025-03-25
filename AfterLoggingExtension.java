@@ -143,7 +143,7 @@ public class AfterLoggingExtension implements AfterAllCallback {
 		}
 	}
 
-	private void exportResults(String outputString, ObjectMapper objectMapper, JsonNode testRunInfo) {
+	private void exportResults(String outputString) {
 		try {
 			// Create file only if it doesn't exist
 			File myObj = new File(filepath + csvFilename);
@@ -157,9 +157,15 @@ public class AfterLoggingExtension implements AfterAllCallback {
 			} catch (Exception e) {
 				System.err.println("Could open/write/close supportData.csv file - Ignore this error");
 			}
-			
-	        File testRunInfoFile = new File(filepath + testRunInfoFilename);
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(testRunInfoFile, testRunInfo);
+		} catch (IOException e) {
+			System.err.println("Could not create supportData.csv file - Ignore this error");
+		}
+	}
+	
+	private void saveTestRunInfo(ObjectMapper objectMapper, JsonNode testRunInfo) {
+     try {
+		File testRunInfoFile = new File(filepath + testRunInfoFilename);
+        objectMapper.writerWithDefaultPrettyPrinter().writeValue(testRunInfoFile, testRunInfo);
 		} catch (IOException e) {
 			System.err.println("Could not create supportData.csv file - Ignore this error");
 		}
@@ -167,6 +173,7 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	
 	@Override
 	public void afterAll(ExtensionContext arg0) throws Exception {
+		System.out.println("\n\ntranspiration: "+LoggingSingleton.getCurrentTestRunNumber()+ "\n\n");
 		if (!diffsWritten) {
 			writeDiffs(LoggingSingleton.getCurrentTestRunNumber());
 			diffsWritten = true;
@@ -174,10 +181,10 @@ public class AfterLoggingExtension implements AfterAllCallback {
 		
 		LoggingSingleton.addTimeStamp();
 		if (LoggingSingleton.isOperationSupported()) {
-			exportResults(LoggingSingleton.getFullMessage(),
-						  LoggingSingleton.getObjectMapper(),
-						  LoggingSingleton.getTestRunInfo());
+			exportResults(LoggingSingleton.getFullMessage());
 		}
+		
+		saveTestRunInfo(LoggingSingleton.getObjectMapper(), LoggingSingleton.getTestRunInfo());
 	}
 
 }

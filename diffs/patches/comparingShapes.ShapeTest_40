@@ -1,0 +1,654 @@
+17;
+INSERT
+0,
+2,
+
+import org.junit.AfterClass;
+DELETE
+5,
+		// TODO: Nothing to change here. But note,
+		// there is only one way to sort circles, since sorting by
+		// radius, perimeter, or area will always give the same results.
+		// To make this code run without crashing, make the Circle class
+		// Comparable (that is, change the Circle class)
+0,
+CHANGE
+5,
+		// TODO: Nothing to write here. Just study this example. Note that we
+		// can sort triangles by perimeter or area, so it isn't enough to make
+		// triangles implement Comparable. For maximum flexibility, we write and
+		// pass Comparator objects to the sort() method to compare triangles by
+		// perimeter and by area.
+1,
+
+CHANGE
+2,
+				return (int) Math
+						.signum(first.perimeter() - second.perimeter());
+1,
+				return (int) Math.signum(first.perimeter() - second.perimeter());
+CHANGE
+1,
+		// TODO: Create and add a comparator to compare triangles by area,
+1,
+		// A comparator to compare triangles by area,
+CHANGE
+1,
+		Arrays.sort(triangles);
+2,
+		Comparator<Triangle> byArea = new TriangleAreaComparator();
+		Arrays.sort(triangles, byArea);
+CHANGE
+2,
+		// TODO: 1 Modify the next line to create a new TreeSet - use the version
+		// of the constructor that takes a
+1,
+
+CHANGE
+1,
+		TreeSet<Triangle> triangleSet = null;
+1,
+		TreeSet<Triangle> triangleSet = new TreeSet<Triangle>(new TriangleAreaComparator());
+CHANGE
+1,
+		// TODO: 2 Iterate through the unsorted triangles array, adding the
+1,
+		// Iterate through the unsorted triangles array, adding the
+INSERT
+0,
+3,
+		for (int i = 0; i < triangles.length; i++) {
+			triangleSet.add(triangles[i]);
+		}
+CHANGE
+2,
+		// TODO: 3 Iterate through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and output them. For an example of the foreach
+2,
+		// Iterates through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and outputs them. For an example of the foreach
+CHANGE
+1,
+		// Format this like the printArray function. But since you don't have an
+1,
+		// Formatted like the printArray function. But since you don't have an
+DELETE
+2,
+		// Challenge: You could get rid of the last character though: remember a
+		// nice string method to do this?
+0,
+CHANGE
+2,
+		
+		
+9,
+		StringBuilder sb = new StringBuilder();
+		sb.append("[");
+		for (Triangle t : triangleSet) {
+			sb.append(t);
+			sb.append(", ");
+		}
+		sb.append("]\n");
+		System.out.println(sb.toString());
+
+CHANGE
+1,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using an iterator:
+2,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using
+		// an iterator:
+CHANGE
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext(); ) {
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext();) {
+CHANGE
+1,
+	@AfterAll
+1,
+	@AfterClass
+17;
+INSERT
+0,
+2,
+
+import org.junit.AfterClass;
+DELETE
+5,
+		// TODO: Nothing to change here. But note,
+		// there is only one way to sort circles, since sorting by
+		// radius, perimeter, or area will always give the same results.
+		// To make this code run without crashing, make the Circle class
+		// Comparable (that is, change the Circle class)
+0,
+CHANGE
+5,
+		// TODO: Nothing to write here. Just study this example. Note that we
+		// can sort triangles by perimeter or area, so it isn't enough to make
+		// triangles implement Comparable. For maximum flexibility, we write and
+		// pass Comparator objects to the sort() method to compare triangles by
+		// perimeter and by area.
+1,
+
+CHANGE
+2,
+				return (int) Math
+						.signum(first.perimeter() - second.perimeter());
+1,
+				return (int) Math.signum(first.perimeter() - second.perimeter());
+CHANGE
+1,
+		// TODO: Create and add a comparator to compare triangles by area,
+1,
+		// A comparator to compare triangles by area,
+CHANGE
+1,
+		Arrays.sort(triangles);
+2,
+		Comparator<Triangle> byArea = new TriangleAreaComparator();
+		Arrays.sort(triangles, byArea);
+CHANGE
+2,
+		// TODO: 1 Modify the next line to create a new TreeSet - use the version
+		// of the constructor that takes a
+1,
+
+CHANGE
+1,
+		TreeSet<Triangle> triangleSet = null;
+1,
+		TreeSet<Triangle> triangleSet = new TreeSet<Triangle>(new TriangleAreaComparator());
+CHANGE
+1,
+		// TODO: 2 Iterate through the unsorted triangles array, adding the
+1,
+		// Iterate through the unsorted triangles array, adding the
+INSERT
+0,
+3,
+		for (int i = 0; i < triangles.length; i++) {
+			triangleSet.add(triangles[i]);
+		}
+CHANGE
+2,
+		// TODO: 3 Iterate through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and output them. For an example of the foreach
+2,
+		// Iterates through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and outputs them. For an example of the foreach
+CHANGE
+1,
+		// Format this like the printArray function. But since you don't have an
+1,
+		// Formatted like the printArray function. But since you don't have an
+DELETE
+2,
+		// Challenge: You could get rid of the last character though: remember a
+		// nice string method to do this?
+0,
+CHANGE
+2,
+		
+		
+9,
+		StringBuilder sb = new StringBuilder();
+		sb.append("[");
+		for (Triangle t : triangleSet) {
+			sb.append(t);
+			sb.append(", ");
+		}
+		sb.append("]\n");
+		System.out.println(sb.toString());
+
+CHANGE
+1,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using an iterator:
+2,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using
+		// an iterator:
+CHANGE
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext(); ) {
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext();) {
+CHANGE
+1,
+	@AfterAll
+1,
+	@AfterClass
+17;
+INSERT
+0,
+2,
+
+import org.junit.AfterClass;
+DELETE
+5,
+		// TODO: Nothing to change here. But note,
+		// there is only one way to sort circles, since sorting by
+		// radius, perimeter, or area will always give the same results.
+		// To make this code run without crashing, make the Circle class
+		// Comparable (that is, change the Circle class)
+0,
+CHANGE
+5,
+		// TODO: Nothing to write here. Just study this example. Note that we
+		// can sort triangles by perimeter or area, so it isn't enough to make
+		// triangles implement Comparable. For maximum flexibility, we write and
+		// pass Comparator objects to the sort() method to compare triangles by
+		// perimeter and by area.
+1,
+
+CHANGE
+2,
+				return (int) Math
+						.signum(first.perimeter() - second.perimeter());
+1,
+				return (int) Math.signum(first.perimeter() - second.perimeter());
+CHANGE
+1,
+		// TODO: Create and add a comparator to compare triangles by area,
+1,
+		// A comparator to compare triangles by area,
+CHANGE
+1,
+		Arrays.sort(triangles);
+2,
+		Comparator<Triangle> byArea = new TriangleAreaComparator();
+		Arrays.sort(triangles, byArea);
+CHANGE
+2,
+		// TODO: 1 Modify the next line to create a new TreeSet - use the version
+		// of the constructor that takes a
+1,
+
+CHANGE
+1,
+		TreeSet<Triangle> triangleSet = null;
+1,
+		TreeSet<Triangle> triangleSet = new TreeSet<Triangle>(new TriangleAreaComparator());
+CHANGE
+1,
+		// TODO: 2 Iterate through the unsorted triangles array, adding the
+1,
+		// Iterate through the unsorted triangles array, adding the
+INSERT
+0,
+3,
+		for (int i = 0; i < triangles.length; i++) {
+			triangleSet.add(triangles[i]);
+		}
+CHANGE
+2,
+		// TODO: 3 Iterate through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and output them. For an example of the foreach
+2,
+		// Iterates through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and outputs them. For an example of the foreach
+CHANGE
+1,
+		// Format this like the printArray function. But since you don't have an
+1,
+		// Formatted like the printArray function. But since you don't have an
+DELETE
+2,
+		// Challenge: You could get rid of the last character though: remember a
+		// nice string method to do this?
+0,
+CHANGE
+2,
+		
+		
+9,
+		StringBuilder sb = new StringBuilder();
+		sb.append("[");
+		for (Triangle t : triangleSet) {
+			sb.append(t);
+			sb.append(", ");
+		}
+		sb.append("]\n");
+		System.out.println(sb.toString());
+
+CHANGE
+1,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using an iterator:
+2,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using
+		// an iterator:
+CHANGE
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext(); ) {
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext();) {
+CHANGE
+1,
+	@AfterAll
+1,
+	@AfterClass
+17;
+INSERT
+0,
+2,
+
+import org.junit.AfterClass;
+DELETE
+5,
+		// TODO: Nothing to change here. But note,
+		// there is only one way to sort circles, since sorting by
+		// radius, perimeter, or area will always give the same results.
+		// To make this code run without crashing, make the Circle class
+		// Comparable (that is, change the Circle class)
+0,
+CHANGE
+5,
+		// TODO: Nothing to write here. Just study this example. Note that we
+		// can sort triangles by perimeter or area, so it isn't enough to make
+		// triangles implement Comparable. For maximum flexibility, we write and
+		// pass Comparator objects to the sort() method to compare triangles by
+		// perimeter and by area.
+1,
+
+CHANGE
+2,
+				return (int) Math
+						.signum(first.perimeter() - second.perimeter());
+1,
+				return (int) Math.signum(first.perimeter() - second.perimeter());
+CHANGE
+1,
+		// TODO: Create and add a comparator to compare triangles by area,
+1,
+		// A comparator to compare triangles by area,
+CHANGE
+1,
+		Arrays.sort(triangles);
+2,
+		Comparator<Triangle> byArea = new TriangleAreaComparator();
+		Arrays.sort(triangles, byArea);
+CHANGE
+2,
+		// TODO: 1 Modify the next line to create a new TreeSet - use the version
+		// of the constructor that takes a
+1,
+
+CHANGE
+1,
+		TreeSet<Triangle> triangleSet = null;
+1,
+		TreeSet<Triangle> triangleSet = new TreeSet<Triangle>(new TriangleAreaComparator());
+CHANGE
+1,
+		// TODO: 2 Iterate through the unsorted triangles array, adding the
+1,
+		// Iterate through the unsorted triangles array, adding the
+INSERT
+0,
+3,
+		for (int i = 0; i < triangles.length; i++) {
+			triangleSet.add(triangles[i]);
+		}
+CHANGE
+2,
+		// TODO: 3 Iterate through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and output them. For an example of the foreach
+2,
+		// Iterates through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and outputs them. For an example of the foreach
+CHANGE
+1,
+		// Format this like the printArray function. But since you don't have an
+1,
+		// Formatted like the printArray function. But since you don't have an
+DELETE
+2,
+		// Challenge: You could get rid of the last character though: remember a
+		// nice string method to do this?
+0,
+CHANGE
+2,
+		
+		
+9,
+		StringBuilder sb = new StringBuilder();
+		sb.append("[");
+		for (Triangle t : triangleSet) {
+			sb.append(t);
+			sb.append(", ");
+		}
+		sb.append("]\n");
+		System.out.println(sb.toString());
+
+CHANGE
+1,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using an iterator:
+2,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using
+		// an iterator:
+CHANGE
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext(); ) {
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext();) {
+CHANGE
+1,
+	@AfterAll
+1,
+	@AfterClass
+17;
+INSERT
+0,
+2,
+
+import org.junit.AfterClass;
+DELETE
+5,
+		// TODO: Nothing to change here. But note,
+		// there is only one way to sort circles, since sorting by
+		// radius, perimeter, or area will always give the same results.
+		// To make this code run without crashing, make the Circle class
+		// Comparable (that is, change the Circle class)
+0,
+CHANGE
+5,
+		// TODO: Nothing to write here. Just study this example. Note that we
+		// can sort triangles by perimeter or area, so it isn't enough to make
+		// triangles implement Comparable. For maximum flexibility, we write and
+		// pass Comparator objects to the sort() method to compare triangles by
+		// perimeter and by area.
+1,
+
+CHANGE
+2,
+				return (int) Math
+						.signum(first.perimeter() - second.perimeter());
+1,
+				return (int) Math.signum(first.perimeter() - second.perimeter());
+CHANGE
+1,
+		// TODO: Create and add a comparator to compare triangles by area,
+1,
+		// A comparator to compare triangles by area,
+CHANGE
+1,
+		Arrays.sort(triangles);
+2,
+		Comparator<Triangle> byArea = new TriangleAreaComparator();
+		Arrays.sort(triangles, byArea);
+CHANGE
+2,
+		// TODO: 1 Modify the next line to create a new TreeSet - use the version
+		// of the constructor that takes a
+1,
+
+CHANGE
+1,
+		TreeSet<Triangle> triangleSet = null;
+1,
+		TreeSet<Triangle> triangleSet = new TreeSet<Triangle>(new TriangleAreaComparator());
+CHANGE
+1,
+		// TODO: 2 Iterate through the unsorted triangles array, adding the
+1,
+		// Iterate through the unsorted triangles array, adding the
+INSERT
+0,
+3,
+		for (int i = 0; i < triangles.length; i++) {
+			triangleSet.add(triangles[i]);
+		}
+CHANGE
+2,
+		// TODO: 3 Iterate through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and output them. For an example of the foreach
+2,
+		// Iterates through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and outputs them. For an example of the foreach
+CHANGE
+1,
+		// Format this like the printArray function. But since you don't have an
+1,
+		// Formatted like the printArray function. But since you don't have an
+DELETE
+2,
+		// Challenge: You could get rid of the last character though: remember a
+		// nice string method to do this?
+0,
+CHANGE
+2,
+		
+		
+9,
+		StringBuilder sb = new StringBuilder();
+		sb.append("[");
+		for (Triangle t : triangleSet) {
+			sb.append(t);
+			sb.append(", ");
+		}
+		sb.append("]\n");
+		System.out.println(sb.toString());
+
+CHANGE
+1,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using an iterator:
+2,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using
+		// an iterator:
+CHANGE
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext(); ) {
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext();) {
+CHANGE
+1,
+	@AfterAll
+1,
+	@AfterClass
+17;
+INSERT
+0,
+2,
+
+import org.junit.AfterClass;
+DELETE
+5,
+		// TODO: Nothing to change here. But note,
+		// there is only one way to sort circles, since sorting by
+		// radius, perimeter, or area will always give the same results.
+		// To make this code run without crashing, make the Circle class
+		// Comparable (that is, change the Circle class)
+0,
+CHANGE
+5,
+		// TODO: Nothing to write here. Just study this example. Note that we
+		// can sort triangles by perimeter or area, so it isn't enough to make
+		// triangles implement Comparable. For maximum flexibility, we write and
+		// pass Comparator objects to the sort() method to compare triangles by
+		// perimeter and by area.
+1,
+
+CHANGE
+2,
+				return (int) Math
+						.signum(first.perimeter() - second.perimeter());
+1,
+				return (int) Math.signum(first.perimeter() - second.perimeter());
+CHANGE
+1,
+		// TODO: Create and add a comparator to compare triangles by area,
+1,
+		// A comparator to compare triangles by area,
+CHANGE
+1,
+		Arrays.sort(triangles);
+2,
+		Comparator<Triangle> byArea = new TriangleAreaComparator();
+		Arrays.sort(triangles, byArea);
+CHANGE
+2,
+		// TODO: 1 Modify the next line to create a new TreeSet - use the version
+		// of the constructor that takes a
+1,
+
+CHANGE
+1,
+		TreeSet<Triangle> triangleSet = null;
+1,
+		TreeSet<Triangle> triangleSet = new TreeSet<Triangle>(new TriangleAreaComparator());
+CHANGE
+1,
+		// TODO: 2 Iterate through the unsorted triangles array, adding the
+1,
+		// Iterate through the unsorted triangles array, adding the
+INSERT
+0,
+3,
+		for (int i = 0; i < triangles.length; i++) {
+			triangleSet.add(triangles[i]);
+		}
+CHANGE
+2,
+		// TODO: 3 Iterate through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and output them. For an example of the foreach
+2,
+		// Iterates through the TreeSet using a foreach loop (Java's
+		// "enhanced" for loop) and outputs them. For an example of the foreach
+CHANGE
+1,
+		// Format this like the printArray function. But since you don't have an
+1,
+		// Formatted like the printArray function. But since you don't have an
+DELETE
+2,
+		// Challenge: You could get rid of the last character though: remember a
+		// nice string method to do this?
+0,
+CHANGE
+2,
+		
+		
+9,
+		StringBuilder sb = new StringBuilder();
+		sb.append("[");
+		for (Triangle t : triangleSet) {
+			sb.append(t);
+			sb.append(", ");
+		}
+		sb.append("]\n");
+		System.out.println(sb.toString());
+
+CHANGE
+1,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using an iterator:
+2,
+		// Thanks for continuing to read. The foreach loop is just shorthand for using
+		// an iterator:
+CHANGE
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext(); ) {
+1,
+		for (Iterator<Triangle> iter = triangleSet.iterator(); iter.hasNext();) {
+CHANGE
+1,
+	@AfterAll
+1,
+	@AfterClass
