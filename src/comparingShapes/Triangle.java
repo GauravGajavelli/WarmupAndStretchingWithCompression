@@ -28,8 +28,8 @@ public class Triangle {
 	 */
 	public double area() {
 		// TODO: Implement this. Hint: lookup and use Heron's formula. 
-		throw new UnsupportedOperationException("TODO: delete this statement and implement this operation.");
-
+		double s = (a+b+c)/2;
+		return Math.sqrt(s*(s-a)*(s-b)*(s-c));
 	}
 
 	/**

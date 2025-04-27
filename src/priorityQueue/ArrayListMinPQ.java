@@ -13,7 +13,7 @@ public class ArrayListMinPQ<T extends Comparable<T>> {
 	private ArrayList<T> items;
 
 	public ArrayListMinPQ() {
-		items = new ArrayList<>();
+		items = new ArrayList<T>();
 	}
 
 	public T findMin() {
