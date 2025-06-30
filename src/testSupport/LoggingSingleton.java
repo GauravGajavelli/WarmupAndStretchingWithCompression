@@ -18,7 +18,7 @@ public class LoggingSingleton {
 	static private boolean operationSupported;
 	static private ObjectMapper objectMapper;
 	static private JsonNode testRunInfo;
-	static private String testFileName; // Works off of the assumption of one test running at a time
+	static private String testFileName; // Works off of the assumption of one test per logger
 	static private String testFilePackageName;
 	
 	// TODO Remove this/get rid of duplicates
@@ -127,6 +127,16 @@ public class LoggingSingleton {
         ObjectNode testFileNameNode = getOrCreateObjectNode(added, testFileName);
         ArrayNode testNameArray = getOrCreateArrayNode(testFileNameNode, testName);
         testNameArray.add(currentRunNumber);
+        
+    	LoggingSingleton.testRunInfo = ((JsonNode)(added));
+    }
+    
+    public static void addRunTime() {
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+        int currentRunNumber = getCurrentTestRunNumber(); // it's already incremented, presumably
+
+        ObjectNode runTimesNode = getOrCreateObjectNode(added, "runTimes");
+        runTimesNode.put(Integer.toString(currentRunNumber), LoggingSingleton.timestamp);
         
     	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }

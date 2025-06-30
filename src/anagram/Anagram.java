@@ -31,6 +31,10 @@ public class Anagram {
 			final int initialCount = 0;
 			Map<Character, Integer> s1CharCount = new HashMap<>();
 			Map<Character, Integer> s2CharCount = new HashMap<>();
+			Map<Character, Integer> s3CharCount = new HashMap<>();
+			Map<Character, Integer> s4CharCount = new HashMap<>();
+			Map<Character, Integer> s5CharCount = new HashMap<>();
+			Map<Character, Integer> s6CharCount = new HashMap<>();
 			for (int k = 0, z = s1.length(); k < z; k++) {
 				Character c1 = Character.toLowerCase(s1.charAt(k));
 				Character c2 = Character.toLowerCase(s2.charAt(k));

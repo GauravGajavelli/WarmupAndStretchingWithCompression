@@ -16,6 +16,7 @@ public class BeforeLoggingExtension implements BeforeAllCallback {
 		if (!incremented) {
 			LoggingSingleton.incrementRunNumber();
 			incremented = true;
+	        LoggingSingleton.addRunTime();
 		}
 		
 		Class<?> testClass = arg0.getTestClass().orElseThrow();
