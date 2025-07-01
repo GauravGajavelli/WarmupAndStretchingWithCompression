@@ -7,22 +7,33 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.utils.IOUtils;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
@@ -104,23 +115,17 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	    return Arrays.asList(content.split("\\r?\\n"));
 	}
 
-	private void writeCompressedContents(String toWritePath, String fileName, String toWrite) {
-	    try (
-	        // Create or overwrite the file
-	        FileOutputStream fos = new FileOutputStream(toWritePath, false);
-	        BufferedOutputStream bos = new BufferedOutputStream(fos);
-	        ZipOutputStream zos = new ZipOutputStream(bos)
-	    ) {
-	        // Add a single entry (file) to the ZIP
-	        ZipEntry entry = new ZipEntry(fileName);
-	        zos.putNextEntry(entry);
-
-	        // Write data for this entry
-	        zos.write(toWrite.getBytes(StandardCharsets.UTF_8));
-
-	        // Close the entry
-	        zos.closeEntry();
-
+	private void writeContents(String toWritePath, String fileName, String toWrite) {
+	    try {
+	    	Path file = Path.of(toWritePath);
+	        // `StandardOpenOption.CREATE` replaces the file if it already exists.
+	        Files.writeString(
+	                file,
+	                toWrite,
+	                StandardCharsets.UTF_8,
+	                StandardOpenOption.CREATE,
+	                StandardOpenOption.TRUNCATE_EXISTING   // overwrite
+	        );
 	    } catch (IOException e) {
 	        e.printStackTrace();
 	    }
@@ -139,12 +144,14 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	private void addDiffedFile(String fileName, String packageName, Path revisedPath, String sourcePath, int testRunNumber) {
 		// Create this path if it didn't exist: testSupport/diffs/patches/filename
 		String toWriteName = fileName + "_" + testRunNumber;
-		String toWritePath = filepath + "diffs/patches/" + packageName + "." + toWriteName + compressionSuffix;
+		String toWritePath = filepath + "diffs/patches/" + packageName + "." + toWriteName;
 		try {
 			
 			// Read in the files
-	        List<String> original = readCompressedContents(sourcePath + compressionSuffix);
+	        List<String> original = readCompressedContents(sourcePath);
 	        List<String> revised = 	Files.readAllLines(revisedPath);
+//	        System.out.println("source: "+sourcePath);
+//	        System.out.println("revised: "+revisedPath);
 	
 	        // Compute the diff: original -> revised
 	        Patch<String> patch = new Patch<>();
@@ -163,7 +170,7 @@ public class AfterLoggingExtension implements AfterAllCallback {
 			createDirectoriesIfNotCreated(toWritePath);
 
 			String diffString = buildDiffOutputString(deltas);
-			writeCompressedContents(toWritePath,toWriteName+".java",diffString);
+			writeContents(toWritePath,toWriteName+".java",diffString);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -171,13 +178,105 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	}
 	
 	private boolean baselineExists(String baselineFilePath) {
-		baselineFilePath += compressionSuffix;
+//		baselineFilePath += compressionSuffix;
 		
 		return Files.exists(Paths.get(baselineFilePath));
+	}
+
+	private void tarDiffs(int testRunNumber) {
+		Path diffsDir = Paths.get(filepath).resolve("diffs");
+		Path targetTar = Paths.get(filepath, "diffs.tar");
+
+		try (OutputStream fOut = Files.newOutputStream(targetTar);
+		     BufferedOutputStream bOut = new BufferedOutputStream(fOut);
+		     TarArchiveOutputStream tOut = new TarArchiveOutputStream(bOut)) {
+
+		    tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+
+		    Files.walk(diffsDir)
+		         .filter(Files::isRegularFile)
+		         .forEach(p -> {
+		             try {
+		                 Path rel = diffsDir.relativize(p);
+		                 TarArchiveEntry entry = new TarArchiveEntry(p.toFile(), rel.toString());
+		                 tOut.putArchiveEntry(entry);
+		                 Files.copy(p, tOut);
+		                 tOut.closeArchiveEntry();
+		             } catch (IOException ex) {
+		                 throw new UncheckedIOException(ex);
+		             }
+		         });
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	private void deleteDiffs(int testRunNumber) {
+	    Path pathToBeDeleted = Paths.get(filepath).resolve("diffs");
+	    if (Files.exists(pathToBeDeleted)) {
+	        try {
+				Files.walk(pathToBeDeleted)
+				     .sorted(Comparator.reverseOrder())   // delete children before parents
+				     .forEach(p -> {
+				         try { Files.delete(p); }
+				         catch (IOException e) { throw new UncheckedIOException(e); }
+				     });
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+	    }
+	}
+	
+	private void untarDiffs(int testRunNumber) {
+		Path diffsDir = Paths.get(filepath).resolve("diffs");
+	    Path tarPath  = Paths.get(filepath, "diffs.tar");
+	    boolean empty = true;
+
+	    try (InputStream fIn  = Files.newInputStream(tarPath);
+	         BufferedInputStream bIn = new BufferedInputStream(fIn);
+	         TarArchiveInputStream tIn = new TarArchiveInputStream(bIn)) {
+
+	        TarArchiveEntry entry;
+	        while ((entry = tIn.getNextTarEntry()) != null) {
+	        	
+	        	empty = false;
+
+	            Path outPath = diffsDir.resolve(entry.getName()).normalize();
+
+	            /* Security guard: prevent "../../etc/passwd"–style entries
+	             * from escaping the intended extraction root.
+	             */
+	            if (!outPath.startsWith(diffsDir)) {
+	                throw new IOException("Illegal TAR entry: " + entry.getName());
+	            }
+
+	            if (entry.isDirectory()) {
+	                Files.createDirectories(outPath);
+	            } else {
+	                Files.createDirectories(outPath.getParent());
+	                try (OutputStream o = Files.newOutputStream(outPath)) {
+	                    IOUtils.copy(tIn, o);         // stream file bytes
+	                }
+	                // Preserve timestamp; add other metadata here if you like
+	                FileTime mtime = FileTime.fromMillis(entry.getModTime().getTime());
+	                Files.setLastModifiedTime(outPath, mtime);
+	            }
+	        }
+	    } catch (IOException e) {
+	        e.printStackTrace();
+	    }
+	    
+        if (empty) {
+            File diffsDirectory = new File(filepath+"diffs");
+            diffsDirectory.mkdir();
+        }
 	}
 	
 	private void writeDiffs(int testRunNumber) {
         Path sourceFolder = Paths.get("src/");
+        
         try {
 			Files.walkFileTree(sourceFolder, new SimpleFileVisitor<Path>() {
 			    @Override
@@ -199,7 +298,7 @@ public class AfterLoggingExtension implements AfterAllCallback {
 			                try {
 			                	String sourceContents = new String(Files.readAllBytes(file));
 			        			createDirectoriesIfNotCreated(baselineFilePath);
-			                	writeCompressedContents(baselineFilePath + compressionSuffix, fileName, sourceContents);
+			                	writeContents(baselineFilePath, fileName, sourceContents);
 							} catch (IOException e) {
 								// TODO Auto-generated catch block
 								e.printStackTrace();
@@ -222,6 +321,7 @@ public class AfterLoggingExtension implements AfterAllCallback {
 			e.printStackTrace();
 		}
 	}
+
 
 	private void exportResults(String outputString) {
 		try {
@@ -254,7 +354,11 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	@Override
 	public void afterAll(ExtensionContext arg0) throws Exception {
 		if (!diffsWritten) {
-			writeDiffs(LoggingSingleton.getCurrentTestRunNumber());
+			int currentTestRunNumber = LoggingSingleton.getCurrentTestRunNumber();
+			untarDiffs(currentTestRunNumber);
+			writeDiffs(currentTestRunNumber);
+			tarDiffs(currentTestRunNumber);
+			deleteDiffs(currentTestRunNumber);
 			diffsWritten = true;
 		}
 		
