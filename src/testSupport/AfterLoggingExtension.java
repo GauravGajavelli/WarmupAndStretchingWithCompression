@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
@@ -82,34 +83,9 @@ public class AfterLoggingExtension implements AfterAllCallback {
 		return toRet.toString();
 	}
 	
-	private List<String> readCompressedContents(String path) throws IOException {
-	    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	    
-	    try (
-	        FileInputStream fis = new FileInputStream(Paths.get(path).toFile());
-	        BufferedInputStream bis = new BufferedInputStream(fis);
-	        ZipInputStream zis = new ZipInputStream(bis)
-	    ) {
-	        // Get the first (and only) ZIP entry
-	        ZipEntry entry = zis.getNextEntry();
-	        if (entry == null) {
-	            // No entries found in the ZIP, return an empty list
-	            return Collections.emptyList();
-	        }
-
-	        // Read the ZIP entry content
-	        byte[] buffer = new byte[8192];
-	        int bytesRead;
-	        while ((bytesRead = zis.read(buffer)) != -1) {
-	            baos.write(buffer, 0, bytesRead);
-	        }
-
-	        // Close out this entry
-	        zis.closeEntry();
-	    }
-
-	    // Convert the decompressed bytes to a UTF-8 string
-	    String content = new String(baos.toByteArray(), StandardCharsets.UTF_8);
+	private List<String> readContents(String path) throws IOException {
+	    Path file = Path.of(path);
+	    String content  = Files.readString(file, StandardCharsets.UTF_8);  // Java 11+
 
 	    // Split into lines
 	    return Arrays.asList(content.split("\\r?\\n"));
@@ -131,7 +107,6 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	    }
 	}
 
-	
 	private void createDirectoriesIfNotCreated(String toCreatePath) {
 		// Create output file/directories if it doesn't exist
 		File myObj = new File(toCreatePath);
@@ -140,15 +115,44 @@ public class AfterLoggingExtension implements AfterAllCallback {
             parentDir.mkdirs(); // Creates all necessary subdirs
         }
 	}
+
+	
+	private void createDirectoriesIfNotCreated(String toCreatePath,boolean createDummyFile) {
+		createDirectoriesIfNotCreated(toCreatePath);
+        if (createDummyFile) {
+        	createDummyFileInDirectory(toCreatePath);
+        }
+	}
+	
+	private void createDummyFileInDirectory(String path) {
+        Path dir  = Paths.get(path);     // the directory
+        Path file = dir.resolve("dummy.txt");           // dir + filename
+
+        try {
+            /* 1. Make sure the directory (and any parents) exist. */
+            Files.createDirectories(dir);                // succeeds silently if already there
+
+            /* 2. Actually create the file. 
+                   - CREATE_NEW  → fail if file exists
+                   - CREATE      → create if missing, else truncate (use APPEND to keep contents) */
+            if (!Files.exists(file)) {
+            	Files.createFile(file);                      // = CREATE_NEW
+            }
+        } catch (IOException e) {
+        	e.printStackTrace();
+        }
+	}
 	
 	private void addDiffedFile(String fileName, String packageName, Path revisedPath, String sourcePath, int testRunNumber) {
 		// Create this path if it didn't exist: testSupport/diffs/patches/filename
 		String toWriteName = fileName + "_" + testRunNumber;
 		String toWritePath = filepath + "diffs/patches/" + packageName + "." + toWriteName;
+		System.out.println("Source: "+sourcePath);
+		System.out.println("Revised: "+revisedPath);
 		try {
 			
 			// Read in the files
-	        List<String> original = readCompressedContents(sourcePath);
+	        List<String> original = readContents(sourcePath);
 	        List<String> revised = 	Files.readAllLines(revisedPath);
 //	        System.out.println("source: "+sourcePath);
 //	        System.out.println("revised: "+revisedPath);
@@ -183,7 +187,35 @@ public class AfterLoggingExtension implements AfterAllCallback {
 		return Files.exists(Paths.get(baselineFilePath));
 	}
 
-	private void tarDiffs(int testRunNumber) {
+	private void tarAndZipDiffs() {
+		tarDiffs();
+	    Path diffsDir = Paths.get(filepath).resolve("diffs");
+		Path targetTar = Paths.get(filepath, "diffs.tar");
+	    Path zipPath  = Paths.get(filepath).resolve("diffs.tar.zip"); // final product
+	    // create or overwrite the .zip
+	    try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(zipPath));
+	         InputStream in = Files.newInputStream(targetTar)) {
+
+	        // 1. create an entry – the name inside the zip (no parent dirs!)
+	        ZipEntry entry = new ZipEntry("diffs");
+	        zos.putNextEntry(entry);
+
+	        // 2. copy the file’s bytes into the entry
+	        byte[] buffer = new byte[8_192];
+	        int bytesRead;
+	        while ((bytesRead = in.read(buffer)) != -1) {
+	            zos.write(buffer, 0, bytesRead);
+	        }
+
+	        // 3. close the single entry (zos.close() will also do it implicitly)
+	        zos.closeEntry();
+	    } catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	private void tarDiffs() {
 		Path diffsDir = Paths.get(filepath).resolve("diffs");
 		Path targetTar = Paths.get(filepath, "diffs.tar");
 
@@ -229,10 +261,25 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	    }
 	}
 	
-	private void untarDiffs(int testRunNumber) {
+	
+	private void unzipAndUntarDiffs() {
+		Path zipPath     = Paths.get(filepath, "diffs.tar.zip");
+		Path extractedTar= Paths.get(filepath, "diffs.tar");   // where we’ll drop the inner tar
+
+		try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipPath))) {
+		    ZipEntry entry = zis.getNextEntry();               // there is only one
+		    if (entry != null) {
+		        Files.copy(zis, extractedTar, StandardCopyOption.REPLACE_EXISTING);
+		    }	        
+		    untarDiffs(); // don't delete the tar.zip; it's a kind of backup
+	    } catch (IOException e) {
+	        e.printStackTrace();
+	    }
+	}
+	
+	private void untarDiffs() {
 		Path diffsDir = Paths.get(filepath).resolve("diffs");
 	    Path tarPath  = Paths.get(filepath, "diffs.tar");
-	    boolean empty = true;
 
 	    try (InputStream fIn  = Files.newInputStream(tarPath);
 	         BufferedInputStream bIn = new BufferedInputStream(fIn);
@@ -240,8 +287,6 @@ public class AfterLoggingExtension implements AfterAllCallback {
 
 	        TarArchiveEntry entry;
 	        while ((entry = tIn.getNextTarEntry()) != null) {
-	        	
-	        	empty = false;
 
 	            Path outPath = diffsDir.resolve(entry.getName()).normalize();
 
@@ -267,11 +312,6 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	    } catch (IOException e) {
 	        e.printStackTrace();
 	    }
-	    
-        if (empty) {
-            File diffsDirectory = new File(filepath+"diffs");
-            diffsDirectory.mkdir();
-        }
 	}
 	
 	private void writeDiffs(int testRunNumber) {
@@ -292,9 +332,14 @@ public class AfterLoggingExtension implements AfterAllCallback {
 			            String packageName = packageAndFileName.substring(0,packageAndFileName.length()-fileName.length()-1);
 			            String baselineFilePath = filepath + "diffs/baselines/" + packageName.replace('/', '.') + "." + fileNameNoJava;
 			            
+			            System.out.println("Baseline: "+baselineFilePath);
+			            System.out.println("Current: "+fileNameNoJava);
+			            
 			            if (baselineExists(baselineFilePath)) { // the file already exists, diff it
+			            	System.out.println("Baseline exists");
 			            	addDiffedFile(fileNameNoJava, packageName, file, baselineFilePath, testRunNumber);
 			            } else { // copy it in
+			            	System.out.println("No baseline exists");
 			                try {
 			                	String sourceContents = new String(Files.readAllBytes(file));
 			        			createDirectoriesIfNotCreated(baselineFilePath);
@@ -355,9 +400,10 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	public void afterAll(ExtensionContext arg0) throws Exception {
 		if (!diffsWritten) {
 			int currentTestRunNumber = LoggingSingleton.getCurrentTestRunNumber();
-			untarDiffs(currentTestRunNumber);
+			unzipAndUntarDiffs();
 			writeDiffs(currentTestRunNumber);
-			tarDiffs(currentTestRunNumber);
+			tarAndZipDiffs();
+			Files.deleteIfExists(Paths.get(filepath+"diffs.tar"));
 			deleteDiffs(currentTestRunNumber);
 			diffsWritten = true;
 		}
