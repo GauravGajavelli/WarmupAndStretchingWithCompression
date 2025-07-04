@@ -264,51 +264,38 @@ public class AfterLoggingExtension implements AfterAllCallback {
 	
 	private void unzipAndUntarDiffs() {
 		Path zipPath     = Paths.get(filepath, "diffs.tar.zip");
-		Path extractedTar= Paths.get(filepath, "diffs.tar");   // where we’ll drop the inner tar
-
-		try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipPath))) {
-		    ZipEntry entry = zis.getNextEntry();               // there is only one
-		    if (entry != null) {
-		        Files.copy(zis, extractedTar, StandardCopyOption.REPLACE_EXISTING);
-		    }	        
-		    untarDiffs(); // don't delete the tar.zip; it's a kind of backup
-	    } catch (IOException e) {
-	        e.printStackTrace();
-	    }
-	}
-	
-	private void untarDiffs() {
 		Path diffsDir = Paths.get(filepath).resolve("diffs");
-	    Path tarPath  = Paths.get(filepath, "diffs.tar");
+	    
+		try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipPath))) {
+		    ZipEntry zentry = zis.getNextEntry();               // there is only one
+		    if (zentry != null) {
+//		        Files.copy(zis, extractedTar, StandardCopyOption.REPLACE_EXISTING);
+		        TarArchiveInputStream tis = new TarArchiveInputStream(new BufferedInputStream(zis));
+		        TarArchiveEntry entry;
+		        while ((entry = tis.getNextTarEntry()) != null) {
 
-	    try (InputStream fIn  = Files.newInputStream(tarPath);
-	         BufferedInputStream bIn = new BufferedInputStream(fIn);
-	         TarArchiveInputStream tIn = new TarArchiveInputStream(bIn)) {
+		            Path outPath = diffsDir.resolve(entry.getName()).normalize();
 
-	        TarArchiveEntry entry;
-	        while ((entry = tIn.getNextTarEntry()) != null) {
+		            /* Security guard: prevent "../../etc/passwd"–style entries
+		             * from escaping the intended extraction root.
+		             */
+		            if (!outPath.startsWith(diffsDir)) {
+		                throw new IOException("Illegal TAR entry: " + entry.getName());
+		            }
 
-	            Path outPath = diffsDir.resolve(entry.getName()).normalize();
-
-	            /* Security guard: prevent "../../etc/passwd"–style entries
-	             * from escaping the intended extraction root.
-	             */
-	            if (!outPath.startsWith(diffsDir)) {
-	                throw new IOException("Illegal TAR entry: " + entry.getName());
-	            }
-
-	            if (entry.isDirectory()) {
-	                Files.createDirectories(outPath);
-	            } else {
-	                Files.createDirectories(outPath.getParent());
-	                try (OutputStream o = Files.newOutputStream(outPath)) {
-	                    IOUtils.copy(tIn, o);         // stream file bytes
-	                }
-	                // Preserve timestamp; add other metadata here if you like
-	                FileTime mtime = FileTime.fromMillis(entry.getModTime().getTime());
-	                Files.setLastModifiedTime(outPath, mtime);
-	            }
-	        }
+		            if (entry.isDirectory()) {
+		                Files.createDirectories(outPath);
+		            } else {
+		                Files.createDirectories(outPath.getParent());
+		                try (OutputStream o = Files.newOutputStream(outPath)) {
+		                    IOUtils.copy(tis, o);         // stream file bytes
+		                }
+		                // Preserve timestamp; add other metadata here if you like
+		                FileTime mtime = FileTime.fromMillis(entry.getModTime().getTime());
+		                Files.setLastModifiedTime(outPath, mtime);
+		            }
+		        }
+		    }
 	    } catch (IOException e) {
 	        e.printStackTrace();
 	    }

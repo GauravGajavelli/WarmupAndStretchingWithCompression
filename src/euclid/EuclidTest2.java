@@ -22,7 +22,7 @@ import testSupport.BeforeEachLoggingExtension;
 @ExtendWith(BeforeEachLoggingExtension.class)
 public class EuclidTest2 {
 	private static float points = 0;
-	private static final float MAX_POINTS = 80;
+	private static final float MAX_POINTS = 6;
 
 	@Test
 	public void testBasic() {
