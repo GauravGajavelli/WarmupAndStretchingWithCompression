@@ -6,12 +6,19 @@ import java.util.NoSuchElementException;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+
+import testSupport.BeforeEachLoggingExtension;
+import testSupport.LoggingExtension;
 
 /**
  * Test class for {@link DoublyLinkedList}.
  * 
  * @author Curt Clifton
  */
+
+@ExtendWith(LoggingExtension.class)
+@ExtendWith(BeforeEachLoggingExtension.class)
 public class DoublyLinkedListTest {
 
 	private DoublyLinkedList<String> empty;

@@ -89,33 +89,49 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     //================================================================================
 	
 	@Override
-	public void testAborted(ExtensionContext context, Throwable cause) {
-		// Not handling this
-	}
-
-	@Override
-	public void testFailed(ExtensionContext context, Throwable cause) {
-		if (cause != null) {
-			if (cause.getClass() == UnsupportedOperationException.class) {
-				// Operation under test has not yet been implemented
-				LoggingSingleton.recordUnsupportedOperation();
-			} else {
-				// Operation under test has been implemented
-				// But it failed the JUnit test
-				LoggingSingleton.addTestFail();
-			}
-		}
-	}
-
-	@Override
-	public void testSuccessful(ExtensionContext context) {
-		// Operation under test passed the JUnit test
-		LoggingSingleton.addTestPass();
+	public void testAborted(ExtensionContext ctx, Throwable cause) {
+	    setTestRunNumberAndStatusHelper(ctx, TestStatus.ABORTED, cause);
 	}
 	
-    public void testDisabled(ExtensionContext c) { 
-    	
+	public void testDisabled(ExtensionContext ctx) { 
+	    setTestRunNumberAndStatusHelper(ctx, TestStatus.DISABLED);
     }
+    
+	@Override
+	public void testFailed(ExtensionContext ctx, Throwable cause) {
+	    setTestRunNumberAndStatusHelper(ctx, TestStatus.FAILED, cause);
+	}
+
+	@Override
+	public void testSuccessful(ExtensionContext ctx) {
+	    setTestRunNumberAndStatusHelper(ctx, TestStatus.SUCCESSFUL);
+	}
+	
+	public void setTestRunNumberAndStatusHelper(ExtensionContext ctx, TestStatus testStatus) {
+	    // Get the test method name
+	    String testName = ctx.getDisplayName();
+	    
+	    // Get the test class
+	    Class<?> testClass = ctx.getTestClass()
+	        .orElseThrow(() -> new IllegalStateException("No test class"));
+	    String testFileName = testClass.getSimpleName();
+	
+	    // Optionally get the file name (assuming standard naming and location)
+		LoggingSingleton.setTestRunNumberAndStatus(testFileName, testName, testStatus);		
+	}
+	
+	public void setTestRunNumberAndStatusHelper(ExtensionContext ctx, TestStatus testStatus, Throwable testCause) {
+	    // Get the test method name
+	    String testName = ctx.getDisplayName();
+	    
+	    // Get the test class
+	    Class<?> testClass = ctx.getTestClass()
+	        .orElseThrow(() -> new IllegalStateException("No test class"));
+	    String testFileName = testClass.getSimpleName();
+	
+	    // Optionally get the file name (assuming standard naming and location)
+		LoggingSingleton.setTestRunNumberAndStatus(testFileName, testName, testStatus, testCause.toString());		
+	}
 	
     //================================================================================
     // State Class
@@ -148,9 +164,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
         //================================================================================
 
     	static private final String tempFilepath = "src/testSupport/temp/";
-//    	static private final String prevRunDataFilepath = "src/testSupport/run/";
     	static private final String filepath = "src/testSupport/";
     	static private final String testRunInfoFilename = "testRunInfo.json";
+    	static private final String startTestRunInfoFilename  = "startTestRunInfo.json";
     	static private final String diffsTarFilename = "diffs.tar";
     	static private final String diffsTarZipFilename = "diffs.tar.zip";
     	
@@ -263,7 +279,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	                Files.createDirectories(upDirectory);
     	            } else {
     	                Files.createDirectories(upDirectory);
-    	                try (OutputStream o = Files.newOutputStream(outPath, StandardOpenOption.CREATE)) {
+    	                try (OutputStream o = Files.newOutputStream(outPath, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE)) {
     	                    IOUtils.copy(tIn, o);         // stream file bytes
     	                }
     	                // Preserve timestamp; add other metadata here if you like
@@ -405,10 +421,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     			            String baselineFilePath = filepath + "diffs/baselines/" + packageName.replace('/', '.') + "." + fileNameNoJava;
     			            
     			            if (baselineExists(baselineFilePath)) { // the file already exists, diff it
-//    			            	System.out.println("Baseline exists");
+    			            	System.out.println("Baseline exists");
     			            	addDiffedFile(fileNameNoJava, packageName, file, baselineFilePath, testRunNumber);
     			            } else { // copy it in
-//    			            	System.out.println("No baseline exists");
+    			            	System.out.println("No baseline exists");
     			                try {
     			                	String sourceContents = new String(Files.readAllBytes(file));
     			        			createDirectoriesIfNotCreated(baselineFilePath);
@@ -541,14 +557,16 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
         @Override public void close() {
         	System.out.println("B: Should only run once");
 			int currentTestRunNumber = logger.getCurrentTestRunNumber();
+			
 			unzipAndUntarDiffs();
 			writeDiffs(currentTestRunNumber);
 			tarAndZipDiffs();
 			
 			// Delete loaded files
 			deletePath(filepath+"diffs");
+
 			try {
-				Files.delete(Paths.get(filepath+testRunInfoFilename));
+//				Files.delete(Paths.get(filepath+testRunInfoFilename));
 				Files.delete(Paths.get(filepath+diffsTarZipFilename));
 			} catch (IOException e) {
 				e.printStackTrace();

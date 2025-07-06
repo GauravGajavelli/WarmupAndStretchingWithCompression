@@ -9,7 +9,7 @@ public class Euclid {
 	 */
 	public static long gcd(long a, long b) {
 		//throw new UnsupportedOperationException("TODO: delete this statement and implement this operation.");
-		if (a == 1) return 0;
+		if (a == 2) return 0;
 		return (b == 0) ? a : gcd(b, a % b);
 	}
 
