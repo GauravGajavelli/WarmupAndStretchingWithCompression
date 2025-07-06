@@ -57,22 +57,30 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     // BeforeAll Variables and Methods
     //================================================================================
 	
+	private static boolean storeInitialized = false;
     // lives for the whole JVM
     private static final Namespace NS = Namespace.GLOBAL;
 
     public void beforeAll(ExtensionContext ctx) {
-        State global = (State) ctx.getRoot().getStore(NS)
-           .getOrComputeIfAbsent(State.class, k -> new State());      // ← creates once
-        global.initLogger();
-
-		// Initialize the static fields in the singleton
-		String testClassName = ctx.getDisplayName();
-    	LoggingSingleton.incrementRunNumber();
-    	LoggingSingleton.addRunTime();
+    	if (!storeInitialized) {
+	        State global = (State) ctx.getRoot().getStore(NS)
+	           .getOrComputeIfAbsent(State.class, k -> new State());      // ← creates once
+	        global.initLogger();
+	
+			// Initialize the static fields in the singleton
+			String testClassName = ctx.getDisplayName();
+	    	LoggingSingleton.incrementRunNumber();
+	    	LoggingSingleton.addRunTime();
+	    	
+	    	storeInitialized = true;
+    	}
 		
 		Class<?> testClass = ctx.getTestClass().orElseThrow();
         String testFileName = testClass.getSimpleName();
         String packageName = testClass.getPackageName();
+        
+        System.out.println("CurrentTestFilePath: "+testFileName+", "+packageName);
+        
         LoggingSingleton.setCurrentTestFilePath(testFileName, packageName);
 	}
 
@@ -126,6 +134,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
         //================================================================================
 
         void initLogger() {
+        	System.out.println("A: Should only run once");
     		Path filesDir = Paths.get(filepath);
     	    Path tarPath  = Paths.get(filepath, "run.tar");
 
@@ -530,6 +539,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	}
 
         @Override public void close() {
+        	System.out.println("B: Should only run once");
 			int currentTestRunNumber = logger.getCurrentTestRunNumber();
 			unzipAndUntarDiffs();
 			writeDiffs(currentTestRunNumber);
