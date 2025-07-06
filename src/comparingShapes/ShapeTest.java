@@ -12,8 +12,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import testSupport.LoggingExtension;
-import testSupport.BeforeLoggingExtension;
-import testSupport.AfterLoggingExtension;
 import testSupport.BeforeEachLoggingExtension;
 
 /**
@@ -21,9 +19,8 @@ import testSupport.BeforeEachLoggingExtension;
  * 
  * @author Matt Boutell. Created Dec 1, 2013.
  */
-@ExtendWith(BeforeLoggingExtension.class)
+
 @ExtendWith(LoggingExtension.class)
-@ExtendWith(AfterLoggingExtension.class)
 @ExtendWith(BeforeEachLoggingExtension.class)
 public class ShapeTest {
 

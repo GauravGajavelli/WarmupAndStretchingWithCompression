@@ -13,15 +13,11 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.extension.ExtendWith;
 import testSupport.LoggingExtension;
-import testSupport.BeforeLoggingExtension;
-import testSupport.AfterLoggingExtension;
 import testSupport.BeforeEachLoggingExtension;
 
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@ExtendWith(BeforeLoggingExtension.class)
 @ExtendWith(LoggingExtension.class)
-@ExtendWith(AfterLoggingExtension.class)
 @ExtendWith(BeforeEachLoggingExtension.class)
 
 public class EfficientSearchTest {

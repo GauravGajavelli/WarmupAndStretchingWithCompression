@@ -3,3 +3,5 @@
 .DS_Store
 diffs/
 temp/
+diffs.tar.zip
+testRunInfo.json
