@@ -1,4 +1,5 @@
 *.class
 /bin
 .DS_Store
-.DS_Store
+diffs/
+temp/
