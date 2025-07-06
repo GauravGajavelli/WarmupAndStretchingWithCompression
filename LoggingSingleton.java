@@ -94,18 +94,6 @@ public class LoggingSingleton {
         return prevRunNumber;
     }
     
-    
-    public static void addRunNumberToTest(String testFileName, String testName) {
-    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
-        int currentRunNumber = added.get("prevRunNumber").asInt(); // it's already incremented, presumably
-        
-        ObjectNode testFileNameNode = getOrCreateObjectNode(added, testFileName);
-        ArrayNode testNameArray = getOrCreateArrayNode(testFileNameNode, testName);
-        testNameArray.add(currentRunNumber);
-        
-    	LoggingSingleton.testRunInfo = ((JsonNode)(added));
-    }
-    
     public static void addRunTime() {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
         int currentRunNumber = getCurrentTestRunNumber(); // it's already incremented, presumably
@@ -144,6 +132,31 @@ public class LoggingSingleton {
             toRet = (ArrayNode) existingNode;
         }
         return toRet;
+    }
+    
+    public static void setTestRunNumberAndStatus(String testFileName, String testName, TestStatus status) {
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+        
+    	int currentRunNumber = added.get("prevRunNumber").asInt(); // it's already incremented, presumably
+        
+        ObjectNode testFileNameNode = getOrCreateObjectNode(added, testFileName);
+        ObjectNode testNameNode = getOrCreateObjectNode(testFileNameNode, testName);
+        testNameNode.put(Integer.toString(currentRunNumber),status.toString());
+               
+    	LoggingSingleton.testRunInfo = ((JsonNode)(added));
+    }
+    
+    
+    public static void setTestRunNumberAndStatus(String testFileName, String testName, TestStatus status, String cause) {
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+        
+    	int currentRunNumber = added.get("prevRunNumber").asInt(); // it's already incremented, presumably
+        
+        ObjectNode testFileNameNode = getOrCreateObjectNode(added, testFileName);
+        ObjectNode testNameNode = getOrCreateObjectNode(testFileNameNode, testName);
+        testNameNode.put(Integer.toString(currentRunNumber),status.toString()+": "+cause);
+               
+    	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
     
     public static void setCurrentTestFilePath(String testFileName, String packageName) {
