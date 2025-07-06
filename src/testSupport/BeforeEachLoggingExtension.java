@@ -17,8 +17,8 @@ public class BeforeEachLoggingExtension implements BeforeEachCallback {
 
         String testFileName = testClass.getSimpleName();
 
+        System.out.println("addRunNumberToTest: "+testFileName+", "+testName);
         // Optionally get the file name (assuming standard naming and location)
-        
         LoggingSingleton.addRunNumberToTest(testFileName, testName);
 	}
 }

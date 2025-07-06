@@ -5,3 +5,4 @@ diffs/
 temp/
 diffs.tar.zip
 testRunInfo.json
+run/
