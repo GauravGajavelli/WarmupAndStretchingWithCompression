@@ -158,7 +158,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
 		    try {
 		    	Path testRunInfoPath = Paths.get(filepath+testRunInfoFilename);
 		    	if (Files.notExists(testRunInfoPath)) {
-					Files.move(
+					Files.copy(
 							Paths.get(filepath+startTestRunInfoFilename),
 							testRunInfoPath,
 					        StandardCopyOption.ATOMIC_MOVE,
