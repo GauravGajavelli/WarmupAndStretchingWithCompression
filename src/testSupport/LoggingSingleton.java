@@ -37,9 +37,9 @@ public class LoggingSingleton {
     	try {
 			LoggingSingleton.testRunInfo = objectMapper.readTree(testRunInfoFile);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+    	createSeedIfNotInitialized();
     }
     
     public static LoggingSingleton getInstance() {
@@ -92,6 +92,28 @@ public class LoggingSingleton {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
         int prevRunNumber = incremented.get("prevRunNumber").asInt();
         return prevRunNumber;
+    }
+    
+    private static void createSeedIfNotInitialized () {
+    	int randomSeed = (int) System.nanoTime();
+    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
+    	if (!incremented.hasNonNull("randomSeed")) {
+	        // Increment
+	        incremented.put("randomSeed", randomSeed);
+	    	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
+    	}
+    }
+    
+    public static int getSeed() {
+    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
+        int randomSeed = incremented.get("randomSeed").asInt();
+        return randomSeed;
+    }
+    
+    public static boolean getEncryptDiffs() {
+    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
+        boolean encryptDiffs = incremented.get("encryptDiffs").asBoolean();
+        return encryptDiffs;
     }
     
     public static void addRunTime() {
