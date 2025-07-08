@@ -1,5 +1,6 @@
 {
     "schema_version" : 1.0,
     "prevRunNumber" : 0,
-    "runTimes": {}
+    "runTimes": {},
+    "encryptDiffs":true
   }  
