@@ -71,7 +71,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
 			String testClassName = ctx.getDisplayName();
 	    	LoggingSingleton.incrementRunNumber();
 	    	LoggingSingleton.addRunTime();
-	    	
+
 	    	storeInitialized = true;
     	}
 		
@@ -80,7 +80,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
         String packageName = testClass.getPackageName();
         
         System.out.println("CurrentTestFilePath: "+testFileName+", "+packageName);
-        
+
         LoggingSingleton.setCurrentTestFilePath(testFileName, packageName);
 	}
 
@@ -155,7 +155,19 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	    Path tarPath  = Paths.get(filepath, "run.tar");
 
     	    untarFile(filesDir, tarPath);
-    	    
+		    try {
+		    	Path testRunInfoPath = Paths.get(filepath+testRunInfoFilename);
+		    	if (Files.notExists(testRunInfoPath)) {
+					Files.move(
+							Paths.get(filepath+startTestRunInfoFilename),
+							testRunInfoPath,
+					        StandardCopyOption.ATOMIC_MOVE,
+					        StandardCopyOption.REPLACE_EXISTING);
+		    	}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+
             logger = LoggingSingleton.getInstance();
         }
         
@@ -292,6 +304,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	    }
     	}
     	
+    	
+    	
     	//================================================================================
         // Helpers
         //================================================================================
@@ -325,7 +339,78 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		return toRet.toString();
     	}
     	
-    	private void addDiffedFile(String fileName, String packageName, Path revisedPath, String sourcePath, int testRunNumber) {
+    	public boolean isAlphanum(char c) {
+    		return ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
+    	}
+    	
+    	/**
+    	 * Maps 0–61 → ['0'–'9', 'A'–'Z', 'a'–'z'].
+    	 * Assumes idx has already been reduced with idx = Math.floorMod(x, 62).
+    	 */
+    	private static char idxToAlphanum(int idx) {
+    	    // first block: digits 0–9  (10 chars)
+    	    if (idx < 10) {
+    	        return (char) ('0' + idx);
+    	    }
+    	    idx -= 10;
+
+    	    // second block: uppercase A–Z (26 chars)
+    	    if (idx < 26) {
+    	        return (char) ('A' + idx);
+    	    }
+    	    idx -= 26;
+
+    	    // third block: lowercase a–z (26 chars)
+    	    return (char) ('a' + idx);      // idx now 0-25
+    	}
+    	
+    	public char getEncryptedChar(char c, int seed) {
+            int x = seed ^ c;          // combine seed and character
+            x *= 0x27D4_EB2D;           // mix 1
+            x ^= x >>> 15;              // mix 2
+            x *= 0x85EB_CA6B;           // mix 3
+            x ^= x >>> 13;              // mix 4
+
+    		int span = ('9' - '0' + 1)   // 10 digits
+    		         + ('Z' - 'A' + 1)   // 26 uppercase
+    		         + ('z' - 'a' + 1);  // 26 lowercase
+    		// span == 62
+    		int idx = Math.floorMod(x, span);
+            
+            return idxToAlphanum(idx);
+    	}
+
+    	public String encryptString(String str, int seed) {
+    		boolean sequenceStarted = false;
+    		char seqChar = '$';
+    		StringBuilder toRet = new StringBuilder();
+    		for (int i = 0; i < str.length(); i++) {
+    			char c = str.charAt(i);
+    			if (isAlphanum(c)) {
+    				if (!sequenceStarted) {
+    					seqChar = getEncryptedChar(c,seed);
+    					sequenceStarted = true;
+    				}
+        			toRet.append(seqChar);
+    			} else {
+    				sequenceStarted = false;    				
+    				seqChar = '$';
+    				toRet.append(c);
+    			}
+    		}
+    		return toRet.toString();
+    	}
+    	
+    	public List<String> encryptStrings(List<String> strs, int seed) {
+    		List<String> toRet = new ArrayList<>();
+    		for (String str:strs) {
+    			toRet.add(encryptString(str,seed));
+    		}
+    		return toRet;
+    	}
+    	
+    	private void addDiffedFile(String fileName, String packageName, Path revisedPath, String sourcePath, 
+    			int testRunNumber, int seed, boolean encryptDiffs) {
     		// Create this path if it didn't exist: testSupport/diffs/patches/filename
     		String toWriteName = fileName + "_" + testRunNumber;
     		String toWritePath = filepath + "diffs/patches/" + packageName + "." + toWriteName;
@@ -334,8 +419,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     			// Read in the files
     	        List<String> original = readContents(sourcePath);
     	        List<String> revised = 	Files.readAllLines(revisedPath);
-//    	        System.out.println("source: "+sourcePath);
-//    	        System.out.println("revised: "+revisedPath);
+    	        
+    	        if (encryptDiffs) {
+    	        	revised = encryptStrings(revised,seed); // original should already be encrypted
+    	        }
     	
     	        // Compute the diff: original -> revised
     	        Patch<String> patch = new Patch<>();
@@ -388,7 +475,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		                Files.createDirectories(outPath);
     		            } else {
     		                Files.createDirectories(outPath.getParent());
-    		                try (OutputStream o = Files.newOutputStream(outPath, StandardOpenOption.CREATE)) {
+    		                try (OutputStream o = Files.newOutputStream(outPath, 
+    		    	                StandardOpenOption.CREATE,
+    		    	                StandardOpenOption.TRUNCATE_EXISTING)) {
     		                    IOUtils.copy(tis, o);         // stream file bytes
     		                }
     		                // Preserve timestamp; add other metadata here if you like
@@ -402,7 +491,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	    }
     	}
     	
-    	private void writeDiffs(int testRunNumber) {
+    	private void writeDiffs(int testRunNumber, int seed, boolean encryptDiffs) {
             Path sourceFolder = Paths.get("src/");
             
             try {
@@ -421,16 +510,18 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     			            String baselineFilePath = filepath + "diffs/baselines/" + packageName.replace('/', '.') + "." + fileNameNoJava;
     			            
     			            if (baselineExists(baselineFilePath)) { // the file already exists, diff it
-    			            	System.out.println("Baseline exists");
-    			            	addDiffedFile(fileNameNoJava, packageName, file, baselineFilePath, testRunNumber);
+//    			            	System.out.println("Baseline exists");
+    			            	addDiffedFile(fileNameNoJava, packageName, file, baselineFilePath, testRunNumber, seed, encryptDiffs);
     			            } else { // copy it in
-    			            	System.out.println("No baseline exists");
+//    			            	System.out.println("No baseline exists");
     			                try {
     			                	String sourceContents = new String(Files.readAllBytes(file));
+    			                	if (encryptDiffs) {
+    			                		sourceContents = encryptString(sourceContents, seed); // one-way encryption
+    			                	}
     			        			createDirectoriesIfNotCreated(baselineFilePath);
     			                	writeContents(baselineFilePath, fileName, sourceContents);
     							} catch (IOException e) {
-    								// TODO Auto-generated catch block
     								e.printStackTrace();
     							}                
     			            }
@@ -463,7 +554,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		Path targetTar = Paths.get(tempFilepath, diffsTarFilename);
     	    Path zipPath  = Paths.get(tempFilepath).resolve(diffsTarZipFilename); // final product
     	    // create or overwrite the .zip
-    	    try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(zipPath, StandardOpenOption.CREATE));
+    	    try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(zipPath, 
+	                StandardOpenOption.CREATE,
+	                StandardOpenOption.TRUNCATE_EXISTING));
     	         InputStream in = Files.newInputStream(targetTar)) {
 
     	        // 1. create an entry – the name inside the zip (no parent dirs!)
@@ -488,7 +581,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		Path diffsDir = Paths.get(filepath).resolve("diffs");
     		Path targetTar = Paths.get(tempFilepath, diffsTarFilename);
 
-    		try (OutputStream fOut = Files.newOutputStream(targetTar, StandardOpenOption.CREATE);
+    		try (OutputStream fOut = Files.newOutputStream(targetTar, 
+	                StandardOpenOption.CREATE,
+	                StandardOpenOption.TRUNCATE_EXISTING);
     		     BufferedOutputStream bOut = new BufferedOutputStream(fOut);
     		     TarArchiveOutputStream tOut = new TarArchiveOutputStream(bOut)) {
 
@@ -557,20 +652,22 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
         @Override public void close() {
         	System.out.println("B: Should only run once");
 			int currentTestRunNumber = logger.getCurrentTestRunNumber();
+			int seed = logger.getSeed();
+			boolean encryptDiffs = logger.getEncryptDiffs();
 			
 			unzipAndUntarDiffs();
-			writeDiffs(currentTestRunNumber);
+			writeDiffs(currentTestRunNumber, seed, encryptDiffs);
 			tarAndZipDiffs();
 			
 			// Delete loaded files
 			deletePath(filepath+"diffs");
 
-			try {
+//			try {
 //				Files.delete(Paths.get(filepath+testRunInfoFilename));
-				Files.delete(Paths.get(filepath+diffsTarZipFilename));
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+//				Files.delete(Paths.get(filepath+diffsTarZipFilename));
+//			} catch (IOException e) {
+//				e.printStackTrace();
+//			}
     		
 			saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo());
 			atomicallySaveTempFiles();

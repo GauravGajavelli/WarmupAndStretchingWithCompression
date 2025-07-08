@@ -25,7 +25,7 @@ public class Anagram {
 	 */
 	public static boolean isAnagram(String s1, String s2) {
 //		throw new UnsupportedOperationException("TODO: delete this statement and implement this operation.");
-		if (s1.length() != s2.length()) {
+		if (s1.length() == s2.length()) {
 			return false;
 		} else {
 			final int initialCount = 0;
