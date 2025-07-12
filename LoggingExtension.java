@@ -339,7 +339,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		return toRet.toString();
     	}
     	
-    	public boolean isAlphanum(char c) {
+    	private boolean isAlphanum(char c) {
     		return ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
     	}
     	
@@ -347,7 +347,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	 * Maps 0–61 → ['0'–'9', 'A'–'Z', 'a'–'z'].
     	 * Assumes idx has already been reduced with idx = Math.floorMod(x, 62).
     	 */
-    	private static char idxToAlphanum(int idx) {
+    	private char idxToAlphanum(int idx) {
     	    // first block: digits 0–9  (10 chars)
     	    if (idx < 10) {
     	        return (char) ('0' + idx);
@@ -364,7 +364,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	    return (char) ('a' + idx);      // idx now 0-25
     	}
     	
-    	public char getEncryptedChar(char c, int seed) {
+    	private char getEncryptedChar(char c, int seed) {
             int x = seed ^ c;          // combine seed and character
             x *= 0x27D4_EB2D;           // mix 1
             x ^= x >>> 15;              // mix 2
@@ -380,7 +380,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
             return idxToAlphanum(idx);
     	}
 
-    	public String encryptString(String str, int seed) {
+    	private String encryptString(String str, int seed) {
     		boolean sequenceStarted = false;
     		char seqChar = '$';
     		StringBuilder toRet = new StringBuilder();
@@ -401,7 +401,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		return toRet.toString();
     	}
     	
-    	public List<String> encryptStrings(List<String> strs, int seed) {
+    	private List<String> encryptStrings(List<String> strs, int seed) {
     		List<String> toRet = new ArrayList<>();
     		for (String str:strs) {
     			toRet.add(encryptString(str,seed));
