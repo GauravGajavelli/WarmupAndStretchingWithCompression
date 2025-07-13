@@ -79,8 +79,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
         String testFileName = testClass.getSimpleName();
         String packageName = testClass.getPackageName();
         
-        System.out.println("CurrentTestFilePath: "+testFileName+", "+packageName);
-
         LoggingSingleton.setCurrentTestFilePath(testFileName, packageName);
 	}
 
@@ -150,7 +148,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
         //================================================================================
 
         void initLogger() {
-        	System.out.println("A: Should only run once");
     		Path filesDir = Paths.get(filepath);
     	    Path tarPath  = Paths.get(filepath, "run.tar");
 
@@ -650,7 +647,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	}
 
         @Override public void close() {
-        	System.out.println("B: Should only run once");
 			int currentTestRunNumber = logger.getCurrentTestRunNumber();
 			int seed = logger.getSeed();
 			boolean encryptDiffs = logger.getEncryptDiffs();
