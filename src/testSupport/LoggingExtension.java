@@ -3,6 +3,9 @@ package testSupport;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ExtensionContext.Namespace;
 import org.junit.jupiter.api.extension.TestWatcher;
+import org.junit.platform.launcher.TestExecutionListener;
+import org.junit.platform.launcher.TestPlan;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
@@ -26,12 +29,8 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Stream;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -40,10 +39,10 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.utils.IOUtils;
-import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
-import org.junit.jupiter.api.extension.ExtensionContext;
 
+import com.fasterxml.jackson.core.exc.StreamWriteException;
+import com.fasterxml.jackson.databind.DatabindException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.difflib.DiffUtils;
@@ -52,7 +51,7 @@ import com.github.difflib.patch.AbstractDelta;
 import com.github.difflib.patch.Patch;
 
 public class LoggingExtension implements TestWatcher, BeforeAllCallback {	
-
+	
     //================================================================================
     // BeforeAll Variables and Methods
     //================================================================================
@@ -62,10 +61,13 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     private static final Namespace NS = Namespace.GLOBAL;
 
     public void beforeAll(ExtensionContext ctx) {
+    	try {
+    		
     	if (!storeInitialized) {
 	        State global = (State) ctx.getRoot().getStore(NS)
 	           .getOrComputeIfAbsent(State.class, k -> new State());      // ← creates once
-	        global.initLogger();
+	        global.initLogger(); // gets invalid
+	        Runtime.getRuntime().addShutdownHook(new Thread(global::blose));
 	
 			// Initialize the static fields in the singleton
 			String testClassName = ctx.getDisplayName();
@@ -74,12 +76,15 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
 
 	    	storeInitialized = true;
     	}
-		
 		Class<?> testClass = ctx.getTestClass().orElseThrow();
         String testFileName = testClass.getSimpleName();
         String packageName = testClass.getPackageName();
         
         LoggingSingleton.setCurrentTestFilePath(testFileName, packageName);
+
+    	} catch (Throwable T) {
+    		LoggingSingleton.logError(T);
+    	}
 	}
 
     //================================================================================
@@ -88,24 +93,51 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
 	
 	@Override
 	public void testAborted(ExtensionContext ctx, Throwable cause) {
-	    setTestRunNumberAndStatusHelper(ctx, TestStatus.ABORTED, cause);
+		try {
+	    
+			setTestRunNumberAndStatusHelper(ctx, TestStatus.ABORTED, cause);
+
+		} catch (Throwable T) {
+    		LoggingSingleton.logError(T);
+		}
+
 	}
 	
 	public void testDisabled(ExtensionContext ctx) { 
+		try {
+		
 	    setTestRunNumberAndStatusHelper(ctx, TestStatus.DISABLED);
+	    
+	} catch (Throwable T) {
+		LoggingSingleton.logError(T);
+	}
+
     }
     
 	@Override
 	public void testFailed(ExtensionContext ctx, Throwable cause) {
-	    setTestRunNumberAndStatusHelper(ctx, TestStatus.FAILED, cause);
+		try {
+	    
+			setTestRunNumberAndStatusHelper(ctx, TestStatus.FAILED, cause);
+	    
+    	} catch (Throwable T) {
+    		LoggingSingleton.logError(T);
+    	}
+
 	}
 
 	@Override
 	public void testSuccessful(ExtensionContext ctx) {
+		try {
+		
 	    setTestRunNumberAndStatusHelper(ctx, TestStatus.SUCCESSFUL);
+	    
+    	} catch (Throwable T) {
+    		LoggingSingleton.logError(T);
+    	}
 	}
 	
-	public void setTestRunNumberAndStatusHelper(ExtensionContext ctx, TestStatus testStatus) {
+	private void setTestRunNumberAndStatusHelper(ExtensionContext ctx, TestStatus testStatus) {
 	    // Get the test method name
 	    String testName = ctx.getDisplayName();
 	    
@@ -118,7 +150,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
 		LoggingSingleton.setTestRunNumberAndStatus(testFileName, testName, testStatus);		
 	}
 	
-	public void setTestRunNumberAndStatusHelper(ExtensionContext ctx, TestStatus testStatus, Throwable testCause) {
+	private void setTestRunNumberAndStatusHelper(ExtensionContext ctx, TestStatus testStatus, Throwable testCause) {
 	    // Get the test method name
 	    String testName = ctx.getDisplayName();
 	    
@@ -147,25 +179,23 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
         // Init Method
         //================================================================================
 
-        void initLogger() {
+        void initLogger() throws IOException {
     		Path filesDir = Paths.get(filepath);
     	    Path tarPath  = Paths.get(filepath, "run.tar");
-
+    	    try {
     	    untarFile(filesDir, tarPath);
-		    try {
 		    	Path testRunInfoPath = Paths.get(filepath+testRunInfoFilename);
 		    	if (Files.notExists(testRunInfoPath)) {
 					Files.copy(
 							Paths.get(filepath+startTestRunInfoFilename),
 							testRunInfoPath,
-					        StandardCopyOption.ATOMIC_MOVE,
 					        StandardCopyOption.REPLACE_EXISTING);
 		    	}
 			} catch (IOException e) {
-				e.printStackTrace();
+		         throw new UncheckedIOException(e);
+			} finally {
+				logger = LoggingSingleton.getInstance();
 			}
-
-            logger = LoggingSingleton.getInstance();
         }
         
         //================================================================================
@@ -195,8 +225,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	    return Arrays.asList(content.split("\\r?\\n"));
     	}
     	
-    	private void writeContents(String toWritePath, String fileName, String toWrite) {
-    	    try {
+    	private void writeContents(String toWritePath, String fileName, String toWrite) throws IOException {
     	    	Path file = Path.of(toWritePath);
     	        // `StandardOpenOption.CREATE` replaces the file if it already exists.
     	        Files.writeString(
@@ -206,9 +235,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	                StandardOpenOption.CREATE,
     	                StandardOpenOption.TRUNCATE_EXISTING   // overwrite
     	        );
-    	    } catch (IOException e) {
-    	        e.printStackTrace();
-    	    }
     	}
     	
     	private void createDirectoriesIfNotCreated(String toCreatePath) {
@@ -220,18 +246,17 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
             }
     	}
 
-    	private void createDirectoriesIfNotCreated(String toCreatePath,boolean createDummyFile) {
+    	private void createDirectoriesIfNotCreated(String toCreatePath,boolean createDummyFile) throws IOException {
     		createDirectoriesIfNotCreated(toCreatePath);
             if (createDummyFile) {
             	createDummyFileInDirectory(toCreatePath);
             }
     	}
     	
-    	private void createDummyFileInDirectory(String path) {
+    	private void createDummyFileInDirectory(String path) throws IOException {
             Path dir  = Paths.get(path);     // the directory
             Path file = dir.resolve("dummy.txt");           // dir + filename
 
-            try {
                 /* 1. Make sure the directory (and any parents) exist. */
                 Files.createDirectories(dir);                // succeeds silently if already there
 
@@ -241,24 +266,17 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
                 if (!Files.exists(file)) {
                 	Files.createFile(file);                      // = CREATE_NEW
                 }
-            } catch (IOException e) {
-            	e.printStackTrace();
-            }
     	}
     	
-    	private void deletePath(String path) {
+    	private void deletePath(String path) throws IOException {
     	    Path pathToBeDeleted = Paths.get(path);
     	    if (Files.exists(pathToBeDeleted)) {
-    	        try {
     				Files.walk(pathToBeDeleted)
     				     .sorted(Comparator.reverseOrder())   // delete children before parents
     				     .forEach(p -> {
     				         try { Files.delete(p); }
     				         catch (IOException e) { throw new UncheckedIOException(e); }
     				     });
-    			} catch (IOException e) {
-    				e.printStackTrace();
-    			}
     	    }
     	}
     	 
@@ -296,8 +314,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	                Files.setLastModifiedTime(outPath, mtime);
     	            }
     	        }
-    	    } catch (IOException e) {
-    	        e.printStackTrace();
+    	    } catch (IOException e) { 
+    	    	throw new UncheckedIOException(e);
     	    }
     	}
     	
@@ -407,12 +425,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	}
     	
     	private void addDiffedFile(String fileName, String packageName, Path revisedPath, String sourcePath, 
-    			int testRunNumber, int seed, boolean encryptDiffs) {
+    			int testRunNumber, int seed, boolean encryptDiffs) throws DiffException, IOException {
     		// Create this path if it didn't exist: testSupport/diffs/patches/filename
     		String toWriteName = fileName + "_" + testRunNumber;
     		String toWritePath = filepath + "diffs/patches/" + packageName + "." + toWriteName;
-    		try {
-    			
     			// Read in the files
     	        List<String> original = readContents(sourcePath);
     	        List<String> revised = 	Files.readAllLines(revisedPath);
@@ -423,11 +439,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	
     	        // Compute the diff: original -> revised
     	        Patch<String> patch = new Patch<>();
-    			try {
     				patch = DiffUtils.diff(original, revised);
-    			} catch (DiffException e) {
-    				e.printStackTrace();
-    			}
     			
     			// Write diffs
     			List<AbstractDelta<String>> deltas = patch.getDeltas();
@@ -439,10 +451,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
 
     			String diffString = buildDiffOutputString(deltas);
     			writeContents(toWritePath,toWriteName+".java",diffString);
-    		} catch (IOException e) {
-    			// TODO Auto-generated catch block
-    			e.printStackTrace();
-    		}
     	}
     		
     	private void unzipAndUntarDiffs() {
@@ -483,15 +491,14 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		            }
     		        }
     		    }
-    	    } catch (IOException e) {
-    	        e.printStackTrace();
+    	    } catch (IOException e) { 
+    	    	throw new UncheckedIOException(e);
     	    }
     	}
     	
-    	private void writeDiffs(int testRunNumber, int seed, boolean encryptDiffs) {
+    	private void writeDiffs(int testRunNumber, int seed, boolean encryptDiffs) throws IOException {
             Path sourceFolder = Paths.get("src/");
-            
-            try {
+
     			Files.walkFileTree(sourceFolder, new SimpleFileVisitor<Path>() {
     			    @Override
     			    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
@@ -505,10 +512,16 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     			            String packageAndFileName = file.toString().substring(sourceFolderPath.length()+1);
     			            String packageName = packageAndFileName.substring(0,packageAndFileName.length()-fileName.length()-1);
     			            String baselineFilePath = filepath + "diffs/baselines/" + packageName.replace('/', '.') + "." + fileNameNoJava;
-    			            
+
     			            if (baselineExists(baselineFilePath)) { // the file already exists, diff it
 //    			            	System.out.println("Baseline exists");
-    			            	addDiffedFile(fileNameNoJava, packageName, file, baselineFilePath, testRunNumber, seed, encryptDiffs);
+    			            	try {
+									addDiffedFile(fileNameNoJava, packageName, file, baselineFilePath, testRunNumber, seed, encryptDiffs);
+	    			    	    } catch (DiffException e) { 
+	    			    	    	throw new UncheckedIOException("DiffException: "+e.getMessage(), null);
+	    			    	    } catch (IOException e) { 
+	    			    	    	throw new UncheckedIOException(e);
+	    			    	    }
     			            } else { // copy it in
 //    			            	System.out.println("No baseline exists");
     			                try {
@@ -518,9 +531,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     			                	}
     			        			createDirectoriesIfNotCreated(baselineFilePath);
     			                	writeContents(baselineFilePath, fileName, sourceContents);
-    							} catch (IOException e) {
-    								e.printStackTrace();
-    							}                
+	    			    	    } catch (IOException e) { 
+	    			    	    	throw new UncheckedIOException(e);
+	    			    	    }
     			            }
     			        }
     			        return FileVisitResult.CONTINUE;
@@ -534,18 +547,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     			        return FileVisitResult.CONTINUE;
     			    }
     			});
-    		} catch (IOException e) {
-    			// TODO Auto-generated catch block
-    			e.printStackTrace();
-    		}
     	}
 
-    	private void tarAndZipDiffs() {
-			try {
-				Files.createDirectories(Paths.get(tempFilepath));
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+    	private void tarAndZipDiffs() throws IOException {
+			Files.createDirectories(Paths.get(tempFilepath));
 
 			tarDiffs();
     		Path targetTar = Paths.get(tempFilepath, diffsTarFilename);
@@ -569,10 +574,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
 
     	        // 3. close the single entry (zos.close() will also do it implicitly)
     	        zos.closeEntry();
-    	    } catch (IOException e) {
-    			e.printStackTrace();
-    		}
-    	}
+    	    } catch (IOException e) { 
+    	    	throw new UncheckedIOException(e);
+    	    }
+	    }
     	
     	private void tarDiffs() {
     		Path diffsDir = Paths.get(filepath).resolve("diffs");
@@ -599,10 +604,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		                 throw new UncheckedIOException(ex);
     		             }
     		         });
-    		} catch (IOException e) {
-    			// TODO Auto-generated catch block
-    			e.printStackTrace();
-    		}
+    	    } catch (IOException e) { 
+    	    	throw new UncheckedIOException(e);
+    	    }
     	}
     	
     	private static void atomicallySaveTempFiles() {
@@ -619,57 +623,60 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		    tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
     		    for (String file:tempFiles) {
     		    	Path p = Paths.get(tempFilepath + file);
-    	             try {
+
     	                 TarArchiveEntry entry = new TarArchiveEntry(p.toFile(), file);
     	                 tOut.putArchiveEntry(entry);
     	                 Files.copy(p, tOut);
     	                 tOut.closeArchiveEntry();
-    	             } catch (IOException ex) {
-    	                 throw new UncheckedIOException(ex);
-    	             }
     		    }
     		    
     		    Files.move(tempTargetTar,targetTar,
     		            StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-    		} catch (IOException e) {
-    			// TODO Auto-generated catch block
-    			e.printStackTrace();
-    		}
-    	}
+    	    } catch (IOException e) { 
+    	    	throw new UncheckedIOException(e);
+    	    }
+		}
 
-    	private static void saveTestRunInfo(ObjectMapper objectMapper, JsonNode testRunInfo) {
-         try {
+    	private static void saveTestRunInfo(ObjectMapper objectMapper, JsonNode testRunInfo) throws StreamWriteException, DatabindException, IOException {
     		File testRunInfoFile = new File(tempFilepath + testRunInfoFilename);
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(testRunInfoFile, testRunInfo);
-    		} catch (IOException e) {
-    			e.printStackTrace();
-    		}
     	}
 
-        @Override public void close() {
-			int currentTestRunNumber = logger.getCurrentTestRunNumber();
-			int seed = logger.getSeed();
-			boolean encryptDiffs = logger.getEncryptDiffs();
-			
-			unzipAndUntarDiffs();
-			writeDiffs(currentTestRunNumber, seed, encryptDiffs);
-			tarAndZipDiffs();
-			
-			// Delete loaded files
-			deletePath(filepath+"diffs");
-
+        public void blose() {
+    		try {
+    			
+    			int currentTestRunNumber = logger.getCurrentTestRunNumber();
+    			int seed = logger.getSeed();
+    			boolean encryptDiffs = logger.getEncryptDiffs();
+    			
+    			unzipAndUntarDiffs();
+    			writeDiffs(currentTestRunNumber, seed, encryptDiffs);
+    			tarAndZipDiffs();
+    			
+    			// Delete loaded files
+    			deletePath(filepath+"diffs");
+    			
 //			try {
 //				Files.delete(Paths.get(filepath+testRunInfoFilename));
 //				Files.delete(Paths.get(filepath+diffsTarZipFilename));
-//			} catch (IOException e) {
-//				e.printStackTrace();
-//			}
-    		
-			saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo());
-			atomicallySaveTempFiles();
-
-			// Delete intermediates
-			deletePath(tempFilepath);
+//    	    } catch (IOException e) { 
+//    	    	throw new UncheckedIOException(e);
+//    	    }
+    			
+    			saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo());
+    			atomicallySaveTempFiles();
+    			
+    			// Delete intermediates
+    			deletePath(tempFilepath);
+    		} catch (Throwable T) {
+    			LoggingSingleton.logError(T);
+    		}
         }
+
+		@Override
+		public void close() throws Throwable {
+			// TODO Auto-generated method stub
+			
+		}
     }
 }
