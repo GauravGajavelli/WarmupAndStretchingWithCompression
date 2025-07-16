@@ -2,8 +2,14 @@ package testSupport;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.Map;
+import java.time.LocalTime;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,26 +29,28 @@ public class LoggingSingleton {
 	// TODO Remove this/get rid of duplicates
 	static private final String filepath = "src/testSupport/";
 	static private final String testRunInfoFilename = "testRunInfo.json";
+	static private final String errorLogFileName = "error-logs.txt";
 
     // Static instance of the singleton class
     private static LoggingSingleton instance;
 
-    private LoggingSingleton() {
+    private LoggingSingleton()  {
     	LoggingSingleton.jUnitTestCounter = 0;
     	LoggingSingleton.failureCount = 0;
     	LoggingSingleton.timestamp = new Timestamp(System.currentTimeMillis()).toString();
     	LoggingSingleton.operationSupported = true;
     	LoggingSingleton.objectMapper = new ObjectMapper();
-        File testRunInfoFile = new File(filepath + testRunInfoFilename);
     	try {
+	        File testRunInfoFile = new File(filepath + testRunInfoFilename);
 			LoggingSingleton.testRunInfo = objectMapper.readTree(testRunInfoFile);
-		} catch (IOException e) {
-			e.printStackTrace();
+    	} catch (IOException e) {
+    		throw new UncheckedIOException(e);
+		} finally {
+	    	createSeedIfNotInitialized();
 		}
-    	createSeedIfNotInitialized();
     }
     
-    public static LoggingSingleton getInstance() {
+    public static LoggingSingleton getInstance() throws IOException {
         if (instance == null) {
             instance = new LoggingSingleton();
         }
@@ -192,6 +200,20 @@ public class LoggingSingleton {
     
     public static String getTestFilePackageName() {
         return LoggingSingleton.testFilePackageName;
+    }
+
+    public static void logError(Throwable throwable) {
+    	try {
+    		String message = LocalTime.now()+" - Message: "+throwable.getMessage();
+    		Files.write(
+    			    Path.of(filepath + errorLogFileName),               // the target file
+    			    List.of(message),            						// data (Iterable<String> or byte[])
+    			    StandardOpenOption.CREATE,               // create the file if it’s missing
+    			    StandardOpenOption.APPEND                // move the write cursor to the end
+    			);
+    	} catch (Throwable T) {
+    		// Do nothing
+    	}
     }
 }
 
