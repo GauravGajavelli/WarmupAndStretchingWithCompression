@@ -26,8 +26,7 @@ public class BeforeEachLoggingExtension implements BeforeEachCallback {
         LoggingSingleton.setTestRunNumberAndStatus(testFileName, testName, TestStatus.ABORTED); // aborted by default
         
     	} catch (Throwable T) {
-//    		LoggingSingleton.logError(T);	
-    		throw T;
+       		LoggingSingleton.logError(T);
     	}
 	}
 }
