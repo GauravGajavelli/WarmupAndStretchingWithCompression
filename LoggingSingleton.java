@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.sql.Timestamp;
 import java.util.List;
@@ -25,11 +26,13 @@ public class LoggingSingleton {
 	static private JsonNode testRunInfo;
 	static private String testFileName; // Works off of the assumption of one test per logger
 	static private String testFilePackageName;
-	
-	// TODO Remove this/get rid of duplicates
+	public static Path tempDirectory;
+	static private boolean erroring;
+
+	static private final String tempFilepath = "src/testSupport/temp/";
 	static private final String filepath = "src/testSupport/";
 	static private final String testRunInfoFilename = "testRunInfo.json";
-	static private final String errorLogFileName = "error-logs.txt";
+	static private final String errorLogFilename = "error-logs.txt";
 
     // Static instance of the singleton class
     private static LoggingSingleton instance;
@@ -40,14 +43,20 @@ public class LoggingSingleton {
     	LoggingSingleton.timestamp = new Timestamp(System.currentTimeMillis()).toString();
     	LoggingSingleton.operationSupported = true;
     	LoggingSingleton.objectMapper = new ObjectMapper();
+    	LoggingSingleton.erroring = false;
     	try {
-	        File testRunInfoFile = new File(filepath + testRunInfoFilename);
+	        File testRunInfoFile = tempDirectory.resolve(filepath).resolve(testRunInfoFilename).toFile();
 			LoggingSingleton.testRunInfo = objectMapper.readTree(testRunInfoFile);
     	} catch (IOException e) {
     		throw new UncheckedIOException(e);
 		} finally {
 	    	createSeedIfNotInitialized();
 		}
+    }
+    
+    public static void initTempDirectory() throws IOException {
+		LoggingSingleton.tempDirectory = Files.createTempDirectory("temp");
+//		System.out.println("New temp directory: "+tempDirectory);
     }
     
     public static LoggingSingleton getInstance() throws IOException {
@@ -203,10 +212,13 @@ public class LoggingSingleton {
     }
 
     public static void logError(Throwable throwable) {
+    	erroring = true;
     	try {
     		String message = LocalTime.now()+" - Message: "+throwable.getMessage();
+//    		System.out.println("ERROR: "+message);
+
     		Files.write(
-    			    Path.of(filepath + errorLogFileName),               // the target file
+    				tempDirectory.resolve(tempFilepath, errorLogFilename),               // the target file
     			    List.of(message),            						// data (Iterable<String> or byte[])
     			    StandardOpenOption.CREATE,               // create the file if it’s missing
     			    StandardOpenOption.APPEND                // move the write cursor to the end
