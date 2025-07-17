@@ -64,10 +64,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	try {
     		
     	if (!storeInitialized) {
-	        State global = (State) ctx.getRoot().getStore(NS)
-	           .getOrComputeIfAbsent(State.class, k -> new State());      // ← creates once
-	        global.initLogger(); // gets invalid
-	        Runtime.getRuntime().addShutdownHook(new Thread(global::blose));
+    		initLogger(); // gets invalid
+	        Runtime.getRuntime().addShutdownHook(new Thread(this::close));
 	
 			// Initialize the static fields in the singleton
 			String testClassName = ctx.getDisplayName();
@@ -137,6 +135,38 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	}
 	}
 	
+    public void close() {
+		try {
+			
+			int currentTestRunNumber = logger.getCurrentTestRunNumber();
+			int seed = logger.getSeed();
+			boolean encryptDiffs = logger.getEncryptDiffs();
+			
+			unzipAndUntarDiffs();
+			writeDiffs(currentTestRunNumber, seed, encryptDiffs);
+			tarAndZipDiffs();
+			
+			// Delete loaded files
+			deletePath(filepath+"diffs");
+			
+//		try {
+//			Files.delete(Paths.get(filepath+testRunInfoFilename));
+//			Files.delete(Paths.get(filepath+diffsTarZipFilename));
+//	    } catch (IOException e) { 
+//	    	throw new UncheckedIOException(e);
+//	    }
+			
+			saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo());
+			atomicallySaveTempFiles();
+			
+			// Delete intermediates
+			deletePath(tempFilepath);
+		} catch (Throwable T) {
+			LoggingSingleton.logError(T);
+		}
+    }
+	
+	
 	private void setTestRunNumberAndStatusHelper(ExtensionContext ctx, TestStatus testStatus) {
 	    // Get the test method name
 	    String testName = ctx.getDisplayName();
@@ -162,17 +192,12 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
 	    // Optionally get the file name (assuming standard naming and location)
 		LoggingSingleton.setTestRunNumberAndStatus(testFileName, testName, testStatus, testCause.toString());		
 	}
-	
-    //================================================================================
-    // State Class
-    //================================================================================
-	
-	private static State state(ExtensionContext c) {
-        return c.getRoot().getStore(NS).get(State.class, State.class);
-    }
 
-    /* closed automatically even when the container is aborted */
-    static final class State implements ExtensionContext.Store.CloseableResource {
+    //================================================================================
+    // Former State Class
+    //================================================================================
+
+    
         private LoggingSingleton logger;
         
         //================================================================================
@@ -641,42 +666,5 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		File testRunInfoFile = new File(tempFilepath + testRunInfoFilename);
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(testRunInfoFile, testRunInfo);
     	}
-
-        public void blose() {
-    		try {
-    			
-    			int currentTestRunNumber = logger.getCurrentTestRunNumber();
-    			int seed = logger.getSeed();
-    			boolean encryptDiffs = logger.getEncryptDiffs();
-    			
-    			unzipAndUntarDiffs();
-    			writeDiffs(currentTestRunNumber, seed, encryptDiffs);
-    			tarAndZipDiffs();
-    			
-    			// Delete loaded files
-    			deletePath(filepath+"diffs");
-    			
-//			try {
-//				Files.delete(Paths.get(filepath+testRunInfoFilename));
-//				Files.delete(Paths.get(filepath+diffsTarZipFilename));
-//    	    } catch (IOException e) { 
-//    	    	throw new UncheckedIOException(e);
-//    	    }
-    			
-    			saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo());
-    			atomicallySaveTempFiles();
-    			
-    			// Delete intermediates
-    			deletePath(tempFilepath);
-    		} catch (Throwable T) {
-    			LoggingSingleton.logError(T);
-    		}
-        }
-
-		@Override
-		public void close() throws Throwable {
-			// TODO Auto-generated method stub
-			
-		}
-    }
+    
 }
