@@ -205,19 +205,19 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
         void initLogger() throws IOException {
         	LoggingSingleton.initTempDirectory();
         	// This line is needed now that temp dirs are being used; nothing exists yet
-        	Files.createDirectories(LoggingSingleton.tempDirectory.resolve(tempFilepath));
-    		Path filesDir = LoggingSingleton.tempDirectory.resolve(filepath);
-    	    Path tarPath  = Paths.get(filepath, "run.tar");
+        	Files.createDirectories(LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory));
+    		Path filesDir = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory);
+    	    Path tarPath  = LoggingSingleton.filepathResolve().resolve(finalTarFilename);
     	    try {
-    	    untarFile(filesDir, tarPath);
-		    	Path testRunInfoPath = LoggingSingleton.tempDirectory.resolve(filepath).resolve(testRunInfoFilename);
-	    		Path errorLogFilePath = LoggingSingleton.tempDirectory.resolve(tempFilepath).resolve(errorLogFilename);
+    	    	untarFile(filesDir, tarPath);
+		    	Path testRunInfoPath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(testRunInfoFilename);
+	    		Path errorLogFilePath = LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory).resolve(errorLogFilename);
 	            if (Files.notExists(errorLogFilePath)) {
 	            	Files.createFile(errorLogFilePath);                      // = CREATE_NEW
 	            }
 		    	if (Files.notExists(testRunInfoPath)) {
 					Files.copy(
-							Paths.get(filepath+startTestRunInfoFilename),
+							LoggingSingleton.filepathResolve().resolve(startTestRunInfoFilename),
 							testRunInfoPath,
 					        StandardCopyOption.REPLACE_EXISTING);
 		    	}
@@ -232,10 +232,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
         // Properties
         //================================================================================
 
-    	static private final String tempFilepath = "src/testSupport/temp/";
-    	static private final String filepath = "src/testSupport/";
     	static private final String testRunInfoFilename = "testRunInfo.json";
     	static private final String startTestRunInfoFilename  = "startTestRunInfo.json";
+    	static private final String finalTarFilename = "run.tar";
     	static private final String diffsTarFilename = "diffs.tar";
     	static private final String diffsTarZipFilename = "diffs.tar.zip";
     	static private final String errorLogFilename = "error-logs.txt";
@@ -244,11 +243,11 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
         // File Utilities
         //================================================================================
     	
-    	private boolean baselineExists(String baselineFilePath) {
+    	private boolean baselineExists(Path baselineFilePath) {
     		return Files.exists(LoggingSingleton.tempDirectory.resolve(baselineFilePath));
     	}
     	
-    	private List<String> readContents(String path) throws IOException {
+    	private List<String> readContents(Path path) throws IOException {
     	    Path file = LoggingSingleton.tempDirectory.resolve(path);
     	    String content  = Files.readString(file, StandardCharsets.UTF_8);  // Java 11+
 
@@ -256,7 +255,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	    return Arrays.asList(content.split("\\r?\\n"));
     	}
     	
-    	private void writeContents(String toWritePath, String fileName, String toWrite) throws IOException {
+    	private void writeContents(Path toWritePath, String fileName, String toWrite) throws IOException {
     	    	Path file = LoggingSingleton.tempDirectory.resolve(toWritePath);
     	        // `StandardOpenOption.CREATE` replaces the file if it already exists.
     	        Files.writeString(
@@ -266,37 +265,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	                StandardOpenOption.CREATE,
     	                StandardOpenOption.TRUNCATE_EXISTING   // overwrite
     	        );
-    	}
-    	
-    	private void createDirectoriesIfNotCreated(String toCreatePath) {
-    		// Create output file/directories if it doesn't exist
-    		File myObj = LoggingSingleton.tempDirectory.resolve(toCreatePath).toFile();
-            File parentDir = myObj.getParentFile();
-            if (parentDir != null && !parentDir.exists()) {
-                parentDir.mkdirs(); // Creates all necessary subdirs
-            }
-    	}
-
-    	private void createDirectoriesIfNotCreated(String toCreatePath,boolean createDummyFile) throws IOException {
-    		createDirectoriesIfNotCreated(toCreatePath);
-            if (createDummyFile) {
-            	createDummyFileInDirectory(toCreatePath);
-            }
-    	}
-    	
-    	private void createDummyFileInDirectory(String path) throws IOException {
-            Path dir  = LoggingSingleton.tempDirectory.resolve(path);     // the directory
-            Path file = dir.resolve("dummy.txt");           // dir + filename
-
-                /* 1. Make sure the directory (and any parents) exist. */
-                Files.createDirectories(dir);                // succeeds silently if already there
-
-                /* 2. Actually create the file. 
-                       - CREATE_NEW  → fail if file exists
-                       - CREATE      → create if missing, else truncate (use APPEND to keep contents) */
-                if (!Files.exists(file)) {
-                	Files.createFile(file);                      // = CREATE_NEW
-                }
     	}
     	 
     	// note that this is gets rid of the outermost folder surrounding the tar
@@ -443,11 +411,11 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		return toRet;
     	}
     	
-    	private void addDiffedFile(String fileName, String packageName, Path revisedPath, String sourcePath, 
+    	private void addDiffedFile(String fileName, String packageName, Path revisedPath, Path sourcePath, 
     			int testRunNumber, int seed, boolean encryptDiffs) throws DiffException, IOException {
     		// Create this path if it didn't exist: testSupport/diffs/patches/filename
     		String toWriteName = fileName + "_" + testRunNumber;
-    		String toWritePath = filepath + "diffs/patches/" + packageName + "." + toWriteName;
+    		Path toWritePath = LoggingSingleton.filepathResolve().resolve("diffs","patches",packageName + "." + toWriteName);
     			// Read in the files
     	        List<String> original = readContents(sourcePath);
     	        List<String> revised = 	Files.readAllLines(revisedPath);
@@ -466,15 +434,15 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     				return;
     			}
     			
-    			createDirectoriesIfNotCreated(toWritePath);
+            	Files.createDirectories(LoggingSingleton.tempDirectory.resolve(toWritePath.getParent()));
 
     			String diffString = buildDiffOutputString(deltas);
     			writeContents(toWritePath,toWriteName+".java",diffString);
     	}
     		
     	private void unzipAndUntarDiffs() {
-    		Path zipPath     = LoggingSingleton.tempDirectory.resolve(filepath, diffsTarZipFilename);
-    		Path diffsDir = LoggingSingleton.tempDirectory.resolve(filepath).resolve("diffs");
+    		Path zipPath     = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(diffsTarZipFilename);
+    		Path diffsDir = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve("diffs");
     		if (Files.notExists(zipPath)) {
     			return;
     		}
@@ -516,7 +484,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	}
     	
     	private void writeDiffs(int testRunNumber, int seed, boolean encryptDiffs) throws IOException {
-            Path sourceFolder = Paths.get("src/"); // traversing the actual src
+			Path sourceFolder = Paths.get("src"); // traversing the actual src
 
     			Files.walkFileTree(sourceFolder, new SimpleFileVisitor<Path>() {
     			    @Override
@@ -526,11 +494,19 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     		            
     			    	if (fileName.endsWith(".java")) {
     			            // We get what's past sourceFolder to String length in the file path, and then separate out the file name at the end
+    			            Path srcRoot   = Paths.get("src");                 //  src/
+    			            Path relative  = srcRoot.relativize(file);         //  e.g.  com/example/util/Tools.java
+    			            Path packagePath = relative.getParent();           //  com/example/util      (still a Path)
+    			            String packageName =
+    			                    packagePath                                   // com/example/util
+    			                        .toString()                               // turn into a String
+    			                        .replace(java.io.File.separatorChar, '.'); // -> com.example.util
 
-    			    		String sourceFolderPath = Paths.get("src/").toString();
-    			            String packageAndFileName = file.toString().substring(sourceFolderPath.length()+1);
-    			            String packageName = packageAndFileName.substring(0,packageAndFileName.length()-fileName.length()-1);
-    			            String baselineFilePath = filepath + "diffs/baselines/" + packageName.replace('/', '.') + "." + fileNameNoJava;
+    			            Path baselineFilePath = 
+    			            		LoggingSingleton
+    			            		.filepathResolve()
+    			            		.resolve("diffs","baselines", packageName + "." + fileNameNoJava); // final file
+
 
     			            if (baselineExists(baselineFilePath)) { // the file already exists, diff it
 //    			            	System.out.println("Baseline exists");
@@ -548,7 +524,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     			                	if (encryptDiffs) {
     			                		sourceContents = encryptString(sourceContents, seed); // one-way encryption
     			                	}
-    			        			createDirectoriesIfNotCreated(baselineFilePath);
+    			                	Files.createDirectories(LoggingSingleton.tempDirectory.resolve(baselineFilePath.getParent()));
     			                	writeContents(baselineFilePath, fileName, sourceContents);
 	    			    	    } catch (IOException e) { 
 	    			    	    	throw new UncheckedIOException(e);
@@ -569,11 +545,16 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	}
 
     	private void tarAndZipDiffs() throws IOException {
-			Files.createDirectories(LoggingSingleton.tempDirectory.resolve(tempFilepath));
+			Files.createDirectories(LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory));
 
 			tarDiffs();
-    		Path targetTar = LoggingSingleton.tempDirectory.resolve(tempFilepath, diffsTarFilename);
-    	    Path zipPath  = LoggingSingleton.tempDirectory.resolve(tempFilepath).resolve(diffsTarZipFilename); // final product
+			
+    	    Path targetTar = LoggingSingleton
+    	    		.tempFilepathResolve(LoggingSingleton.tempDirectory)
+    	    		.resolve(diffsTarFilename);
+    	    Path zipPath = LoggingSingleton
+    	    		.tempFilepathResolve(LoggingSingleton.tempDirectory)
+    	    		.resolve(diffsTarZipFilename);
     	    // create or overwrite the .zip
     	    try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(zipPath, 
 	                StandardOpenOption.CREATE,
@@ -599,8 +580,13 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
 	    }
     	
     	private void tarDiffs() {
-    		Path diffsDir = LoggingSingleton.tempDirectory.resolve(filepath).resolve("diffs");
-    		Path targetTar = LoggingSingleton.tempDirectory.resolve(tempFilepath, diffsTarFilename);
+    		
+    		Path diffsDir = LoggingSingleton
+    				.filepathResolve(LoggingSingleton.tempDirectory)
+    				.resolve("diffs");
+    		Path targetTar = LoggingSingleton
+    				.tempFilepathResolve(LoggingSingleton.tempDirectory)
+    				.resolve(diffsTarFilename);
 
     		try (OutputStream fOut = Files.newOutputStream(targetTar, 
 	                StandardOpenOption.CREATE,
@@ -629,12 +615,16 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
     	}
     	
     	private static void atomicallySaveTempFiles() {
-    		Path targetTar = Paths.get(filepath, "run.tar");
-    		Path tempTargetTar = LoggingSingleton.tempDirectory.resolve(tempFilepath, "run.tar");
+    		Path targetTar = LoggingSingleton
+    				.filepathResolve()
+    				.resolve(finalTarFilename);
+    		Path tempTargetTar = LoggingSingleton
+    				.tempFilepathResolve(LoggingSingleton.tempDirectory)
+    				.resolve(finalTarFilename);
     		List<String> tempFiles = new ArrayList<>();
-    		tempFiles.add(testRunInfoFilename);
     		tempFiles.add(diffsTarZipFilename);
     		tempFiles.add(errorLogFilename);
+    		tempFiles.add(testRunInfoFilename); // Moved to first in list increase readability
     		
     		try (OutputStream fOut = Files.newOutputStream(tempTargetTar); // no StandardOpenOption.CREATE; should fail
     		     BufferedOutputStream bOut = new BufferedOutputStream(fOut);
@@ -642,7 +632,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
 
     		    tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
     		    for (String file:tempFiles) {
-    		    	Path p = LoggingSingleton.tempDirectory.resolve(tempFilepath).resolve(file);
+    		    	Path p = LoggingSingleton
+    	    				.tempFilepathResolve(LoggingSingleton.tempDirectory)
+    	    				.resolve(file);
 
     	                 TarArchiveEntry entry = new TarArchiveEntry(p.toFile(), file);
     	                 tOut.putArchiveEntry(entry);
@@ -658,7 +650,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback {
 		}
 
     	private static void saveTestRunInfo(ObjectMapper objectMapper, JsonNode testRunInfo) throws StreamWriteException, DatabindException, IOException {
-    		File testRunInfoFile = LoggingSingleton.tempDirectory.resolve(tempFilepath).resolve(testRunInfoFilename).toFile();
+    		File testRunInfoFile = LoggingSingleton
+    				.tempFilepathResolve(LoggingSingleton.tempDirectory)
+    				.resolve(testRunInfoFilename).toFile();
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(testRunInfoFile, testRunInfo);
     	}
     
