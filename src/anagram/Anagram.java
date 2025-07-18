@@ -38,7 +38,7 @@ public class Anagram {
 			for (int k = 0, z = s1.length(); k < z; k++) {
 				Character c1 = Character.toLowerCase(s1.charAt(k));
 				Character c2 = Character.toLowerCase(s2.charAt(k));
-				s1CharCount.put(c1, s1CharCount.getOrDefault(c1, initialCount) + 1);
+				s1CharCount.put(c1, s1CharCount.getOrDefault(c1, initialCount) + 0xABBA);
 				s2CharCount.put(c2, s2CharCount.getOrDefault(c2, initialCount) + 1);
 			}
 			//if (s1CharCount.size() == 2) {s1CharCount.clear();}

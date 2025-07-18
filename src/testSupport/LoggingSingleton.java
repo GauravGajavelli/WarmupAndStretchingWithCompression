@@ -29,8 +29,6 @@ public class LoggingSingleton {
 	public static Path tempDirectory;
 	static private boolean erroring;
 
-	static private final String tempFilepath = "src/testSupport/temp/";
-	static private final String filepath = "src/testSupport/";
 	static private final String testRunInfoFilename = "testRunInfo.json";
 	static private final String errorLogFilename = "error-logs.txt";
 
@@ -45,7 +43,10 @@ public class LoggingSingleton {
     	LoggingSingleton.objectMapper = new ObjectMapper();
     	LoggingSingleton.erroring = false;
     	try {
-	        File testRunInfoFile = tempDirectory.resolve(filepath).resolve(testRunInfoFilename).toFile();
+    		if (LoggingSingleton.tempDirectory == null) {
+    			LoggingSingleton.initTempDirectory();
+    		}
+	        File testRunInfoFile = filepathResolve(tempDirectory).resolve(testRunInfoFilename).toFile();
 			LoggingSingleton.testRunInfo = objectMapper.readTree(testRunInfoFile);
     	} catch (IOException e) {
     		throw new UncheckedIOException(e);
@@ -53,49 +54,66 @@ public class LoggingSingleton {
 	    	createSeedIfNotInitialized();
 		}
     }
-    
+
     public static void initTempDirectory() throws IOException {
 		LoggingSingleton.tempDirectory = Files.createTempDirectory("temp");
 //		System.out.println("New temp directory: "+tempDirectory);
     }
-    
+
+    // These replace the following for all OS's
+//	static private final String tempFilepath = "src/testSupport/temp/";
+//	static private final String filepath = "src/testSupport/";
+    public static Path tempFilepathResolve(Path toResolve) {
+    	return toResolve.resolve("src","testSupport","temp");
+    }
+    public static Path filepathResolve(Path toResolve) {
+    	return toResolve.resolve("src","testSupport");
+    }
+    public static Path tempFilepathResolve() {
+    	return Paths.get("src","testSupport","temp");
+    }
+    public static Path filepathResolve() {
+    	return Paths.get("src","testSupport");
+    }
+
+
     public static LoggingSingleton getInstance() throws IOException {
         if (instance == null) {
             instance = new LoggingSingleton();
         }
         return instance;
     }
-    
+
     public static void addTestPass() {
     	LoggingSingleton.jUnitTestCounter++;
     }
-    
+
     public static void addTestFail() {
     	LoggingSingleton.jUnitTestCounter++;
     	LoggingSingleton.failureCount++;
     }
-    
+
     public static void addTimeStamp() {
 
     }
-    
+
     public static void recordUnsupportedOperation() {
     	// Record that the operation under test is not yet implemented
     	LoggingSingleton.operationSupported = false;
     }
-    
+
     public static boolean isOperationSupported() {
     	return LoggingSingleton.operationSupported;
     }
-    
+
     public static ObjectMapper getObjectMapper() {
     	return objectMapper;
     }
-    
+
     public static JsonNode getTestRunInfo() {
     	return testRunInfo;
     }
-    
+
     public static void incrementRunNumber() {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
         int prevRunNumber = incremented.get("prevRunNumber").asInt();
@@ -104,13 +122,13 @@ public class LoggingSingleton {
         incremented.put("prevRunNumber", prevRunNumber + 1);
     	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
     }
-    
+
     public static int getCurrentTestRunNumber() {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
         int prevRunNumber = incremented.get("prevRunNumber").asInt();
         return prevRunNumber;
     }
-    
+
     private static void createSeedIfNotInitialized () {
     	int randomSeed = (int) System.nanoTime();
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
@@ -120,19 +138,19 @@ public class LoggingSingleton {
 	    	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
     	}
     }
-    
+
     public static int getSeed() {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
         int randomSeed = incremented.get("randomSeed").asInt();
         return randomSeed;
     }
-    
+
     public static boolean getEncryptDiffs() {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
         boolean encryptDiffs = incremented.get("encryptDiffs").asBoolean();
         return encryptDiffs;
     }
-    
+
     public static void addRunTime() {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
         int currentRunNumber = getCurrentTestRunNumber(); // it's already incremented, presumably
@@ -142,7 +160,7 @@ public class LoggingSingleton {
         
     	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
-    
+
     public static ObjectNode getOrCreateObjectNode(ObjectNode parent, String nodeName) {
         JsonNode existingNode = parent.get(nodeName);
         ObjectNode toRet;
@@ -157,7 +175,7 @@ public class LoggingSingleton {
         }
         return toRet;
     }
-    
+
     public static ArrayNode getOrCreateArrayNode(ObjectNode parent, String nodeName) {
         JsonNode existingNode = parent.get(nodeName);
         ArrayNode toRet;
@@ -172,7 +190,7 @@ public class LoggingSingleton {
         }
         return toRet;
     }
-    
+
     public static void setTestRunNumberAndStatus(String testFileName, String testName, TestStatus status) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
         
@@ -184,8 +202,7 @@ public class LoggingSingleton {
                
     	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
-    
-    
+
     public static void setTestRunNumberAndStatus(String testFileName, String testName, TestStatus status, String cause) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
         
@@ -197,7 +214,7 @@ public class LoggingSingleton {
                
     	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
-    
+
     public static void setCurrentTestFilePath(String testFileName, String packageName) {
         LoggingSingleton.testFileName = testFileName;
         LoggingSingleton.testFilePackageName = packageName;
@@ -206,7 +223,7 @@ public class LoggingSingleton {
     public static String getTestFileName() {
         return LoggingSingleton.testFileName;
     }
-    
+
     public static String getTestFilePackageName() {
         return LoggingSingleton.testFilePackageName;
     }
@@ -215,10 +232,10 @@ public class LoggingSingleton {
     	erroring = true;
     	try {
     		String message = LocalTime.now()+" - Message: "+throwable.getMessage();
-//    		System.out.println("ERROR: "+message);
+    		System.out.println("ERROR: "+message);
 
     		Files.write(
-    				tempDirectory.resolve(tempFilepath, errorLogFilename),               // the target file
+    				tempFilepathResolve(tempDirectory).resolve(errorLogFilename),               // the target file
     			    List.of(message),            						// data (Iterable<String> or byte[])
     			    StandardOpenOption.CREATE,               // create the file if it’s missing
     			    StandardOpenOption.APPEND                // move the write cursor to the end

@@ -41,7 +41,7 @@ public class EuclidTest2 {
 
 	@Test
 	public void testLargePrimeGcd() {
-		assertEquals(89, Euclid.gcd(178, 445));
+		assertEquals(89, Euclid.gcd(0XDEADBEEF, 445));
 		points += 1;
 	}
 
