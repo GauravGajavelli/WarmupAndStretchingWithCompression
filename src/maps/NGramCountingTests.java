@@ -10,8 +10,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import testSupport.LoggingExtension;
-import testSupport.BeforeEachLoggingExtension;
-
 
 /**
  * Tests NGramCounting.
@@ -20,7 +18,6 @@ import testSupport.BeforeEachLoggingExtension;
  */
 
 @ExtendWith(LoggingExtension.class)
-@ExtendWith(BeforeEachLoggingExtension.class)
 public class NGramCountingTests {
 	private static int points = 0;
 

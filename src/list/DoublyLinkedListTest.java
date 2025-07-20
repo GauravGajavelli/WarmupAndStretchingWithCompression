@@ -8,7 +8,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import testSupport.BeforeEachLoggingExtension;
 import testSupport.LoggingExtension;
 
 /**
@@ -18,7 +17,6 @@ import testSupport.LoggingExtension;
  */
 
 @ExtendWith(LoggingExtension.class)
-@ExtendWith(BeforeEachLoggingExtension.class)
 public class DoublyLinkedListTest {
 
 	private DoublyLinkedList<String> empty;

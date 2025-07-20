@@ -5,7 +5,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import testSupport.LoggingExtension;
-import testSupport.BeforeEachLoggingExtension;
 
 /**
  * Simple introduction or reminder about different kinds of maps.
@@ -15,7 +14,6 @@ import testSupport.BeforeEachLoggingExtension;
  */
 
 @ExtendWith(LoggingExtension.class)
-@ExtendWith(BeforeEachLoggingExtension.class)
 public class EuclidTest3 {
 	private static float points = 0;
 	private static final float MAX_POINTS = 6;

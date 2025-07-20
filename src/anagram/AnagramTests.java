@@ -6,7 +6,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import testSupport.LoggingExtension;
-import testSupport.BeforeEachLoggingExtension;
 
 /**
  * Tests Anagram.
@@ -16,7 +15,6 @@ import testSupport.BeforeEachLoggingExtension;
 
 
 @ExtendWith(LoggingExtension.class)
-@ExtendWith(BeforeEachLoggingExtension.class)
 public class AnagramTests {
 	private static float points = 0;
 	

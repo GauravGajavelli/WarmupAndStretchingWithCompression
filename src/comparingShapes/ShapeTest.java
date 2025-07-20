@@ -12,7 +12,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import testSupport.LoggingExtension;
-import testSupport.BeforeEachLoggingExtension;
 
 /**
  * Tests the circle and triangle classes
@@ -21,7 +20,6 @@ import testSupport.BeforeEachLoggingExtension;
  */
 
 @ExtendWith(LoggingExtension.class)
-@ExtendWith(BeforeEachLoggingExtension.class)
 public class ShapeTest {
 
 	private static int points = 0;

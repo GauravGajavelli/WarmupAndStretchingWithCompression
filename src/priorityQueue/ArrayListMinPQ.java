@@ -28,7 +28,7 @@ public class ArrayListMinPQ<T extends Comparable<T>> {
 
 	public void insert(T item) {
 		Comparator<T> isGE = (z1, z2) -> z2.compareTo(z1);
-		items.add(item);
+		items.add(item); // zazoo
 		items.sort(isGE);		
 	}
 
