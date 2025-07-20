@@ -87,7 +87,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	        String packageName = testClass.getPackageName();
 	        
 	        LoggingSingleton.setCurrentTestFilePath(testFileName, packageName);
-
+//    		int l = 5/0;
     	} catch (Throwable T) {
     		LoggingSingleton.logError(T);
     	}
@@ -199,6 +199,11 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 			writeDiffs(currentTestRunNumber, seed, encryptDiffs);
 			tarAndZipDiffs();
 
+			Path oldErrorLogFilePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(errorLogFilename);
+			Path newErrorLogFilePath = LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory).resolve(errorLogFilename);
+		    Files.move(oldErrorLogFilePath,newErrorLogFilePath,
+		            StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+
 //		try {
 //			Files.delete(Paths.get(filepath+testRunInfoFilename));
 //			Files.delete(Paths.get(filepath+diffsTarZipFilename));
@@ -272,15 +277,16 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
         //================================================================================
 
         private void initLogger() throws IOException {
-        	LoggingSingleton.initTempDirectory();
-        	// This line is needed now that temp dirs are being used; nothing exists yet
-        	Files.createDirectories(LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory));
-    		Path filesDir = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory);
-    	    Path tarPath  = LoggingSingleton.filepathResolve().resolve(finalTarFilename);
     	    try {
+    	    	LoggingSingleton.initTempDirectory();
+    	    	// This line is needed now that temp dirs are being used; nothing exists yet
+    	    	Files.createDirectories(LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory));
+    	    	Path filesDir = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory);
+    	    	Path tarPath  = LoggingSingleton.filepathResolve().resolve(finalTarFilename);
+
     	    	LoggingSingleton.untarFile(filesDir, tarPath);
 		    	Path testRunInfoPath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(testRunInfoFilename);
-	    		Path errorLogFilePath = LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory).resolve(errorLogFilename);
+	    		Path errorLogFilePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(errorLogFilename);
 	            if (Files.notExists(errorLogFilePath)) {
 	            	Files.createFile(errorLogFilePath);                      // = CREATE_NEW
 	            }
@@ -477,7 +483,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     		        while ((entry = tis.getNextTarEntry()) != null) {
 
     		            Path outPath = diffsDir.resolve(entry.getName()).normalize();
-
     		            /* Security guard: prevent "../../etc/passwd"–style entries
     		             * from escaping the intended extraction root.
     		             */
@@ -601,7 +606,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	    }
     	
     	private void tarDiffs() {
-    		
     		Path diffsDir = LoggingSingleton
     				.filepathResolve(LoggingSingleton.tempDirectory)
     				.resolve("diffs");

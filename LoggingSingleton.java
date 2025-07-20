@@ -82,7 +82,7 @@ public class LoggingSingleton {
 
     public static void initTempDirectory() throws IOException {
 		LoggingSingleton.tempDirectory = Files.createTempDirectory("temp");
-//		System.out.println("New temp directory: "+tempDirectory);
+		// System.out.println("New temp directory: "+tempDirectory);
     }
 
     // These replace the following for all OS's
@@ -261,7 +261,7 @@ public class LoggingSingleton {
 	        while ((entry = tIn.getNextTarEntry()) != null) {
 
 	            Path outPath = targetPath.resolve(entry.getName()).normalize();
-
+	            // System.out.println("Untarred: "+outPath);
 	            /* Security guard: prevent "../../etc/passwd"–style entries
 	             * from escaping the intended extraction root.
 	             */
@@ -353,7 +353,7 @@ public class LoggingSingleton {
     public static void logError(Throwable throwable) {
     	try {
     		String message = generateMessage(throwable);
-//    		System.out.println("\n ERROR: "+message);
+    		// System.out.println("\n ERROR: "+message);
     		if (loggedInitialError) {
     			return;
     		}
