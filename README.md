@@ -1,10 +1,10 @@
 Test Plan: 
-- Core Tests
+ Core Tests
   -  
   - 
   - 
   - 
-- Functionality Tests
+ Functionality Tests
   - 
-- Performance Tests
+ Performance Tests
   - 
