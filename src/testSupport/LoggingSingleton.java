@@ -44,6 +44,7 @@ public class LoggingSingleton {
 	static public Path tempDirectory;
 	static public boolean skipLogging;
 	static private boolean loggedInitialError;
+	static private long fileSizes;
 	
 	static private final String testRunInfoFilename = "testRunInfo.json";
 	static private final String errorLogFilename = "error-logs.txt";
@@ -181,6 +182,11 @@ public class LoggingSingleton {
         }
         return toRet;
     }
+    
+
+    public static long getFileSizes() {
+    	return LoggingSingleton.fileSizes;
+    }
 
     //================================================================================
     // Setters
@@ -242,6 +248,16 @@ public class LoggingSingleton {
     public static void setCurrentTestFilePath(String testFileName, String packageName) {
         LoggingSingleton.testFileName = testFileName;
         LoggingSingleton.testFilePackageName = packageName;
+    }
+
+    public static void resetFileSizes() {
+    	LoggingSingleton.fileSizes = 0;
+    }
+    
+    public static void increaseFileSizes(long size) {
+    	if (size > 0) {
+    		LoggingSingleton.fileSizes += size;
+    	}
     }
     
     //================================================================================
