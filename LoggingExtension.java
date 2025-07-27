@@ -66,7 +66,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
     public void beforeAll(ExtensionContext ctx) {
     	try {
-    		if (tarTooBig()) {
+    		if (filesTooBig() || tarTooBig()) {
     			LoggingSingleton.skipLogging = true;
     			return;
     		}
@@ -261,7 +261,37 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	    long size = 10L * MB_SIZE;
 	    return fileLargerThan(tarPath, size);
 	}
-	
+
+	private boolean filesTooBig() throws IOException {
+		LoggingSingleton.resetFileSizes();
+
+		Path sourceFolder = Paths.get("src"); // traversing the actual src
+
+		Files.walkFileTree(sourceFolder, new SimpleFileVisitor<Path>() {
+		    @Override
+		    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+		        String fileName = file.getFileName().toString();
+
+		    	if (fileName.endsWith(".java")) {
+		    		LoggingSingleton.increaseFileSizes(Files.size(file));
+		    	}
+
+		        return FileVisitResult.CONTINUE;
+		    }
+
+		    @Override
+		    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+		        if (dir.getFileName().toString().equals("testSupport")) {
+		            return FileVisitResult.SKIP_SUBTREE;
+		        }
+		        return FileVisitResult.CONTINUE;
+		    }
+		});
+
+	    long size = 10L * MB_SIZE;
+	    return LoggingSingleton.getFileSizes() >= size;
+	}
+
 	private boolean fileLargerThan(Path path, long size) throws IOException {
 		return Files.size(path) >= size;
 	}
@@ -269,9 +299,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     //================================================================================
     // Former State Class
     //================================================================================
-    
+
         private LoggingSingleton logger;
-        
+
         //================================================================================
         // Init Method
         //================================================================================
