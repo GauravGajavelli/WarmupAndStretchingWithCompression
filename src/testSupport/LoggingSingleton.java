@@ -384,6 +384,10 @@ public class LoggingSingleton {
 		     .sorted(Comparator.reverseOrder())
 		     .map(Path::toFile)
 		     .forEach(File::delete);
+			
+    		Files.createDirectories(errorFilepath.getParent());
+    		Files.createDirectories(filesDir);
+    		Files.createDirectories(tarPath.getParent());
     		
    	    	untarFile(filesDir, tarPath);
 //   	    	System.out.print(tempDirectory);
