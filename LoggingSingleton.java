@@ -346,9 +346,18 @@ public class LoggingSingleton {
 	private static String generateMessage(Throwable throwable) {
 		StringBuilder stackStringBuilder = new StringBuilder();
 		throwable.getStackTrace();
+		int messageLength = 0;
+		int messageLengthLimit = 256;
 		for (StackTraceElement ste:throwable.getStackTrace()) {
-			stackStringBuilder.append(ste.toString());
-			stackStringBuilder.append("\n");
+			String steMessage = ste.toString();
+
+			if ((steMessage != null && steMessage.length() > 0)
+					&& messageLength < messageLengthLimit) {
+				stackStringBuilder.append(steMessage);
+				stackStringBuilder.append("\n");
+				
+				messageLength += steMessage.length()+1;
+			}
 		}
 		return "Message "
 				+ LoggingSingleton.getTestRunNumber()
@@ -364,7 +373,7 @@ public class LoggingSingleton {
 				+ stackStringBuilder.toString()
 				+ "\n";
 	}
-		
+
 	// Essentially makes a last-ditch effort to log things properly
     public static void logError(Throwable throwable) {
     	try {
