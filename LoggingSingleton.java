@@ -182,10 +182,22 @@ public class LoggingSingleton {
         }
         return toRet;
     }
-    
 
     public static long getFileSizes() {
     	return LoggingSingleton.fileSizes;
+    }
+
+    public static boolean fileWasTooLarge (Path toCheck) {
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+
+        ObjectNode toIgnoreNode = getOrCreateObjectNode(added, "toIgnore");
+        JsonNode node = toIgnoreNode.get(toCheck.toString());
+        if (node == null) {
+        	return false;
+        }
+        FileIgnoreReasons ignoreReason = FileIgnoreReasons.valueOf(node.asText());
+
+        return ignoreReason == FileIgnoreReasons.TOO_LARGE;
     }
 
     //================================================================================
@@ -235,13 +247,13 @@ public class LoggingSingleton {
 
     public static void setTestRunNumberAndStatus(String testFileName, String testName, TestStatus status, String cause) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
-        
+
     	int currentRunNumber = added.get("prevRunNumber").asInt(); // it's already incremented, presumably
-        
+
         ObjectNode testFileNameNode = getOrCreateObjectNode(added, testFileName);
         ObjectNode testNameNode = getOrCreateObjectNode(testFileNameNode, testName);
         testNameNode.put(Integer.toString(currentRunNumber),status.toString()+": "+cause);
-               
+
     	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
 
@@ -258,6 +270,13 @@ public class LoggingSingleton {
     	if (size > 0) {
     		LoggingSingleton.fileSizes += size;
     	}
+    }
+
+    public static void addTooLargeFile (Path toAdd) {
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+
+        ObjectNode toIgnoreNode = getOrCreateObjectNode(added, "toIgnore");
+        toIgnoreNode.put(toAdd.toString(),FileIgnoreReasons.TOO_LARGE.toString());
     }
     
     //================================================================================
@@ -345,7 +364,7 @@ public class LoggingSingleton {
 	
 	private static String generateMessage(Throwable throwable) {
 		StringBuilder stackStringBuilder = new StringBuilder();
-		throwable.getStackTrace();
+
 		int messageLength = 0;
 		int messageLengthLimit = 256;
 		for (StackTraceElement ste:throwable.getStackTrace()) {
@@ -378,7 +397,7 @@ public class LoggingSingleton {
     public static void logError(Throwable throwable) {
     	try {
     		String message = generateMessage(throwable);
-    		// System.out.println("\n ERROR: "+message);
+//    		 System.out.println("\n ERROR: "+message);
     		if (loggedInitialError) {
     			return;
     		}
