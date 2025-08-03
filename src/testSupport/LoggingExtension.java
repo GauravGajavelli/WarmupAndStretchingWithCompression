@@ -295,6 +295,14 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	private boolean fileLargerThan(Path path, long size) throws IOException {
 		return Files.size(path) >= size;
 	}
+	
+	private boolean fileIsOrWasLargerThan(Path path, long size) throws IOException {
+		boolean larger = fileLargerThan(path, MB_SIZE) || LoggingSingleton.fileWasTooLarge(path);
+		if (larger) {
+			LoggingSingleton.addTooLargeFile(path);
+		}
+		return larger;
+	}
 
     //================================================================================
     // Former State Class
@@ -464,13 +472,14 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     		return toRet;
     	}
     	
+    	
     	private void addDiffedFile(String fileName, String packageName, Path revisedPath, Path sourcePath, 
     			int testRunNumber, int seed, boolean encryptDiffs) throws DiffException, IOException {
     		// Create this path if it didn't exist: testSupport/diffs/patches/filename
     		String toWriteName = fileName + "_" + testRunNumber;
     		Path toWritePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve("diffs","patches",packageName + "." + toWriteName);
     		String diffString;
-    		if (fileLargerThan(sourcePath, MB_SIZE) || fileLargerThan(revisedPath, MB_SIZE)) {
+    		if (fileIsOrWasLargerThan(sourcePath, MB_SIZE) || fileIsOrWasLargerThan(revisedPath, MB_SIZE)) {
     			diffString = "File too large!";
     		} else {
     			// Read in the files
@@ -576,12 +585,14 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     			            } else { // copy it in
 //    			            	System.out.println("No baseline exists");
     			                try {
-    			                	String sourceContents = new String(Files.readAllBytes(file));
-    			                	if (encryptDiffs) {
-    			                		sourceContents = encryptString(sourceContents, seed); // one-way encryption
+    			                	if (!fileIsOrWasLargerThan(file, MB_SIZE)) {
+	    			                	String sourceContents = new String(Files.readAllBytes(file));
+	    			                	if (encryptDiffs) {
+	    			                		sourceContents = encryptString(sourceContents, seed); // one-way encryption
+	    			                	}
+	    			                	Files.createDirectories(baselineFilePath.getParent());
+	    			                	writeContents(baselineFilePath, fileName, sourceContents);
     			                	}
-    			                	Files.createDirectories(baselineFilePath.getParent());
-    			                	writeContents(baselineFilePath, fileName, sourceContents);
 	    			    	    } catch (IOException e) { 
 	    			    	    	throw new UncheckedIOException(e);
 	    			    	    }
