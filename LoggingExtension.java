@@ -591,7 +591,16 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	    			                		sourceContents = encryptString(sourceContents, seed); // one-way encryption
 	    			                	}
 	    			                	Files.createDirectories(baselineFilePath.getParent());
+	    			                	
+	    			                	// Write baseline
 	    			                	writeContents(baselineFilePath, fileName, sourceContents);
+	    			                	
+	    			                	// Write creation patch
+	    			                	String fileCreated = "File created!";
+	    			                	String toWriteName = fileNameNoJava + "_" + testRunNumber;
+	    			                	Path toWritePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve("diffs","patches",packageName + "." + toWriteName);
+	    			                	Files.createDirectories(toWritePath.getParent());
+	    			                	writeContents(toWritePath,toWriteName+".java",fileCreated);
     			                	}
 	    			    	    } catch (IOException e) { 
 	    			    	    	throw new UncheckedIOException(e);
