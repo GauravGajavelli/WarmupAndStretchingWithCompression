@@ -42,7 +42,6 @@ public class LoggingSingleton {
 	static private String testFileName; // Works off of the assumption of one test per logger
 	static private String testFilePackageName;
 	static public Path tempDirectory;
-	static public boolean skipLogging;
 	static private boolean loggedInitialError;
 	static private long fileSizes;
 	
@@ -62,7 +61,6 @@ public class LoggingSingleton {
     private LoggingSingleton()  {
     	LoggingSingleton.timestamp = new Timestamp(System.currentTimeMillis()).toString();
     	LoggingSingleton.objectMapper = new ObjectMapper();
-    	LoggingSingleton.skipLogging = false;
     	LoggingSingleton.loggedInitialError = false;
     	try {
     		if (LoggingSingleton.tempDirectory == null) {
@@ -147,10 +145,39 @@ public class LoggingSingleton {
         return LoggingSingleton.testFilePackageName;
     }
     
-    private static int getTestRunNumber() {
+    public static boolean getRebaselining() {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
-    	int currentRunNumber = added.get("prevRunNumber").asInt(); // it's already incremented, presumably
-    	return currentRunNumber;
+    	boolean rebaselining = added.get("rebaselining").asBoolean(); // it's already incremented, presumably
+    	return rebaselining;
+    }
+    
+    public static int getPreviousBaselineRunNumber () {
+		ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+		int prevBaselineRunNumber = added.get("prevBaselineRunNumber").asInt(); // it's already incremented, presumably
+		return prevBaselineRunNumber;
+    }
+   
+    public static long getFileSizes() {
+    	return LoggingSingleton.fileSizes;
+    }
+
+    public static boolean fileWasTooLarge (Path toCheck) {
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+
+        ObjectNode toIgnoreNode = getOrCreateObjectNode(added, "toIgnore");
+        JsonNode node = toIgnoreNode.get(toCheck.toString());
+        if (node == null) {
+        	return false;
+        }
+        FileIgnoreReasons ignoreReason = FileIgnoreReasons.valueOf(node.asText());
+
+        return ignoreReason == FileIgnoreReasons.TOO_LARGE;
+    }
+    
+    public static boolean getSkipLogging() {
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+    	boolean skipLogging = added.get("skipLogging").asBoolean(); // it's already incremented, presumably
+    	return skipLogging;
     }
     
     private static ObjectNode getOrCreateObjectNode(ObjectNode parent, String nodeName) {
@@ -183,22 +210,6 @@ public class LoggingSingleton {
         return toRet;
     }
 
-    public static long getFileSizes() {
-    	return LoggingSingleton.fileSizes;
-    }
-
-    public static boolean fileWasTooLarge (Path toCheck) {
-    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
-
-        ObjectNode toIgnoreNode = getOrCreateObjectNode(added, "toIgnore");
-        JsonNode node = toIgnoreNode.get(toCheck.toString());
-        if (node == null) {
-        	return false;
-        }
-        FileIgnoreReasons ignoreReason = FileIgnoreReasons.valueOf(node.asText());
-
-        return ignoreReason == FileIgnoreReasons.TOO_LARGE;
-    }
 
     //================================================================================
     // Setters
@@ -277,6 +288,26 @@ public class LoggingSingleton {
 
         ObjectNode toIgnoreNode = getOrCreateObjectNode(added, "toIgnore");
         toIgnoreNode.put(toAdd.toString(),FileIgnoreReasons.TOO_LARGE.toString());
+    }
+    
+    public static void setRebaselining(boolean isRebaselining) {
+    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
+        incremented.put("rebaselining", isRebaselining);
+    	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
+    }
+    
+    public static void updatePreviousBaselineRunNumber() {
+    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
+    	
+        // Update
+        incremented.put("prevBaselineRunNumber", LoggingSingleton.getCurrentTestRunNumber());
+    	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
+    }
+    
+    public static void setSkipLogging(boolean skipLogging) {
+    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
+        incremented.put("skipLoggins", skipLogging);
+    	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
     }
     
     //================================================================================
@@ -379,7 +410,7 @@ public class LoggingSingleton {
 			}
 		}
 		return "Message "
-				+ LoggingSingleton.getTestRunNumber()
+				+ LoggingSingleton.getCurrentTestRunNumber()
 				+" - "
 				+ LocalTime.now()
 				+ ": "
@@ -402,7 +433,7 @@ public class LoggingSingleton {
     			return;
     		}
     		loggedInitialError = true;
-    		skipLogging = true;
+    		setSkipLogging(true);
     		
     		Path errorFilepath = tempFilepathResolve(tempDirectory).resolve(errorLogFilename);
     		Path filesDir = LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory);
