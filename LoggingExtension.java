@@ -66,12 +66,13 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
     public void beforeAll(ExtensionContext ctx) {
     	try {
-    		if (filesTooBig() || tarTooBig()) {
-    			LoggingSingleton.skipLogging = true;
+    		if ((getRepoFilesSize() > (10L * MB_SIZE)) || tarTooBig()) {
+    			LoggingSingleton.setSkipLogging(true);
     			return;
     		}
 	    		
 	    	if (!storeInitialized) {
+	    		
 	    		initLogger(); // gets invalid
 		        Runtime.getRuntime().addShutdownHook(new Thread(this::close));
 		
@@ -88,6 +89,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	        
 	        LoggingSingleton.setCurrentTestFilePath(testFileName, packageName);
 //    		int l = 5/0;
+	        
     	} catch (Throwable T) {
     		LoggingSingleton.logError(T);
     	}
@@ -95,14 +97,14 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     
 	@Override
 	public void beforeEach(ExtensionContext arg0) throws Exception {
-		if (LoggingSingleton.skipLogging) {
-			return;
-		}
-		
+
 	    // System.out.println("Running " + this + " on thread: " + Thread.currentThread().getName());
 
 		try {
-//		    public static void addRunNumberToTest(String testFileName, String testName)
+			if (LoggingSingleton.getSkipLogging()) {
+				return;
+			}
+		// public static void addRunNumberToTest(String testFileName, String testName)
         // Get the test method name
         String testName = arg0.getDisplayName();
 
@@ -124,13 +126,13 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 	@Override
 	public void testAborted(ExtensionContext ctx, Throwable cause) {
-		if (LoggingSingleton.skipLogging) {
-			return;
-		}
 		
 		try {
-	    
+			if (LoggingSingleton.getSkipLogging()) {
+				return;
+			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.ABORTED, cause);
+
 
 		} catch (Throwable T) {
     		LoggingSingleton.logError(T);
@@ -139,12 +141,12 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	}
 	
 	public void testDisabled(ExtensionContext ctx) { 
-		if (LoggingSingleton.skipLogging) {
-			return;
-		}
+		
 
 		try {
-		
+			if (LoggingSingleton.getSkipLogging()) {
+				return;
+			}
 	    setTestRunNumberAndStatusHelper(ctx, TestStatus.DISABLED);
 	    
 	} catch (Throwable T) {
@@ -155,12 +157,11 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     
 	@Override
 	public void testFailed(ExtensionContext ctx, Throwable cause) {
-		if (LoggingSingleton.skipLogging) {
-			return;
-		}
 
 		try {
-	    
+			if (LoggingSingleton.getSkipLogging()) {
+				return;
+			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.FAILED, cause);
 	    
     	} catch (Throwable T) {
@@ -171,25 +172,23 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 	@Override
 	public void testSuccessful(ExtensionContext ctx) {
-		if (LoggingSingleton.skipLogging) {
-			return;
-		}
-
 		try {
-		
-	    setTestRunNumberAndStatusHelper(ctx, TestStatus.SUCCESSFUL);
-	    
+			if (LoggingSingleton.getSkipLogging()) {
+				return;
+			}
+			setTestRunNumberAndStatusHelper(ctx, TestStatus.SUCCESSFUL);
     	} catch (Throwable T) {
     		LoggingSingleton.logError(T);
     	}
 	}
 	
+	// Final method run
     public void close() {
-		if (LoggingSingleton.skipLogging) {
-			return;
-		}
-
+		
 		try {
+			if (LoggingSingleton.getSkipLogging()) {
+				return;
+			}
 			
 			int currentTestRunNumber = logger.getCurrentTestRunNumber();
 			int seed = logger.getSeed();
@@ -262,19 +261,13 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	    return fileLargerThan(tarPath, size);
 	}
 
-	private boolean filesTooBig() throws IOException {
+	private long getFilesSize(Path sourceFolder) throws IOException {
 		LoggingSingleton.resetFileSizes();
-
-		Path sourceFolder = Paths.get("src"); // traversing the actual src
 
 		Files.walkFileTree(sourceFolder, new SimpleFileVisitor<Path>() {
 		    @Override
 		    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-		        String fileName = file.getFileName().toString();
-
-		    	if (fileName.endsWith(".java")) {
-		    		LoggingSingleton.increaseFileSizes(Files.size(file));
-		    	}
+	    		LoggingSingleton.increaseFileSizes(Files.size(file));	
 
 		        return FileVisitResult.CONTINUE;
 		    }
@@ -288,8 +281,16 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 		    }
 		});
 
-	    long size = 10L * MB_SIZE;
-	    return LoggingSingleton.getFileSizes() >= size;
+	    return LoggingSingleton.getFileSizes();
+	}
+	
+	private long getRepoFilesSize() throws IOException {
+		Path sourceFolder = Paths.get("src"); // traversing the actual src
+		return getFilesSize(sourceFolder);
+	}
+	
+	private long getUncompressedDiffSize() throws IOException {
+		return getFilesSize(LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve("diffs"));
 	}
 
 	private boolean fileLargerThan(Path path, long size) throws IOException {
@@ -345,10 +346,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
         // File Utilities
         //================================================================================
     	
-    	private boolean baselineExists(Path baselineFilePath) {
-    		return Files.exists(baselineFilePath);
-    	}
-    	
     	private List<String> readContents(Path path) throws IOException {
     	    Path file = LoggingSingleton.tempDirectory.resolve(path);
     	    String content  = Files.readString(file, StandardCharsets.UTF_8);  // Java 11+
@@ -357,7 +354,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	    return Arrays.asList(content.split("\\r?\\n"));
     	}
     	
-    	private void writeContents(Path toWritePath, String fileName, String toWrite) throws IOException {
+    	private long writeContents(Path toWritePath, String fileName, String toWrite) throws IOException {
     	        // `StandardOpenOption.CREATE` replaces the file if it already exists.
     	        Files.writeString(
     	        		toWritePath,
@@ -366,6 +363,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	                StandardOpenOption.CREATE,
     	                StandardOpenOption.TRUNCATE_EXISTING   // overwrite
     	        );
+    	        return Files.size(toWritePath);
     	}
     	
     	
@@ -473,7 +471,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	}
     	
     	
-    	private void addDiffedFile(String fileName, String packageName, Path revisedPath, Path sourcePath, 
+    	private long addDiffedFile(String fileName, String packageName, Path revisedPath, Path sourcePath, 
     			int testRunNumber, int seed, boolean encryptDiffs) throws DiffException, IOException {
     		// Create this path if it didn't exist: testSupport/diffs/patches/filename
     		String toWriteName = fileName + "_" + testRunNumber;
@@ -497,18 +495,18 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     			// Write diffs
     			List<AbstractDelta<String>> deltas = patch.getDeltas();
     			if (deltas == null || deltas.size() == 0) {
-    				return;
+    				return 0;
     			}
     			
             	Files.createDirectories(toWritePath.getParent());
 
     			diffString = buildDiffOutputString(deltas);
     		}
-			writeContents(toWritePath,toWriteName+".java",diffString);
+			return writeContents(toWritePath,toWriteName+".java",diffString);
     	}
 
     	private void unzipAndUntarDiffs() {
-    		Path zipPath     = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(diffsTarZipFilename);
+    		Path zipPath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(diffsTarZipFilename);
     		Path diffsDir = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve("diffs");
     		if (Files.notExists(zipPath)) {
     			return;
@@ -550,6 +548,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	}
     	
     	private void writeDiffs(int testRunNumber, int seed, boolean encryptDiffs) throws IOException {
+    		boolean rebaselining = LoggingSingleton.getRebaselining();
+    		int previousBaselineRunNumber = LoggingSingleton.getPreviousBaselineRunNumber();
+    		
+    		LoggingSingleton.resetFileSizes();
 			Path sourceFolder = Paths.get("src"); // traversing the actual src
 
     			Files.walkFileTree(sourceFolder, new SimpleFileVisitor<Path>() {
@@ -571,12 +573,13 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     			            Path baselineFilePath = 
     			            		LoggingSingleton
     			            		.filepathResolve(LoggingSingleton.tempDirectory)
-    			            		.resolve("diffs","baselines", packageName + "." + fileNameNoJava); // final file
+    			            		.resolve("diffs","baselines", packageName + "." + fileNameNoJava + "_" + previousBaselineRunNumber); // final file
 
-    			            if (baselineExists(baselineFilePath)) { // the file already exists, diff it
+    			            if (Files.exists(baselineFilePath) && !rebaselining) { // the file already exists, diff it
 //    			            	System.out.println("Baseline exists");
     			            	try {
-									addDiffedFile(fileNameNoJava, packageName, file, baselineFilePath, testRunNumber, seed, encryptDiffs);
+    			            		long sizeWritten = addDiffedFile(fileNameNoJava, packageName, file, baselineFilePath, testRunNumber, seed, encryptDiffs);
+    			            		LoggingSingleton.increaseFileSizes(sizeWritten);
 	    			    	    } catch (DiffException e) { 
 	    			    	    	throw new UncheckedIOException("DiffException: "+e.getMessage(), null);
 	    			    	    } catch (IOException e) { 
@@ -595,12 +598,15 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	    			                	// Write baseline
 	    			                	writeContents(baselineFilePath, fileName, sourceContents);
 	    			                	
-	    			                	// Write creation patch
-	    			                	String fileCreated = "File created!";
-	    			                	String toWriteName = fileNameNoJava + "_" + testRunNumber;
-	    			                	Path toWritePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve("diffs","patches",packageName + "." + toWriteName);
-	    			                	Files.createDirectories(toWritePath.getParent());
-	    			                	writeContents(toWritePath,toWriteName+".java",fileCreated);
+	    			                	if (!rebaselining) {
+		    			                	// Write creation patch
+		    			                	String fileCreated = "File created!";
+		    			                	String toWriteName = fileNameNoJava + "_" + testRunNumber;
+		    			                	Path toWritePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve("diffs","patches",packageName + "." + toWriteName);
+		    			                	Files.createDirectories(toWritePath.getParent());
+		    			                	long sizeWritten = writeContents(toWritePath,toWriteName+".java",fileCreated);
+		    			                	LoggingSingleton.increaseFileSizes(sizeWritten);
+	    			                	}
     			                	}
 	    			    	    } catch (IOException e) { 
 	    			    	    	throw new UncheckedIOException(e);
@@ -618,6 +624,15 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     			        return FileVisitResult.CONTINUE;
     			    }
     			});
+    			
+        		if (rebaselining) {
+        			LoggingSingleton.updatePreviousBaselineRunNumber();
+        		}
+    			
+    			LoggingSingleton.setRebaselining(false);
+    			if (LoggingSingleton.getFileSizes() > (MB_SIZE*0.5)) { // written more than a MB
+    				LoggingSingleton.setRebaselining(true);
+    			}
     	}
 
     	private void tarAndZipDiffs() throws IOException {
