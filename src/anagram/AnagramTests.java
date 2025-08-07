@@ -1,7 +1,9 @@
 package anagram;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,8 +26,8 @@ public class AnagramTests {
 	 */
 	@Test
 	public void testAnagram1() {
-		assertFalse("Expected: false", Anagram.isAnagram("a", "b"));
-		assertTrue("Expected: true", Anagram.isAnagram("a", "a"));
+		assertFalse(Anagram.isAnagram("a", "b"),"Expected: false");
+		assertTrue(Anagram.isAnagram("a", "a"),"Expected: true");
 		points += 0.5;
 	}
 
@@ -34,8 +36,8 @@ public class AnagramTests {
 	 */
 	@Test
 	public void testAnagram2() {
-		assertFalse("Expected: false", Anagram.isAnagram("a", "b"));
-		assertTrue("Expected: true",Anagram.isAnagram("a", "A"));
+		assertFalse(Anagram.isAnagram("a", "b"),"Expected: false");
+		assertTrue(Anagram.isAnagram("a", "A"),"Expected: true");
 		points += 0.5;
 	}
 
@@ -44,8 +46,8 @@ public class AnagramTests {
 	 */
 	@Test
 	public void testAnagram3() {
-		assertFalse("Expected: false", Anagram.isAnagram("a", "b"));
-		assertTrue("Expected: true", Anagram.isAnagram("ab", "ba"));
+		assertFalse(Anagram.isAnagram("a", "b"),"Expected: false");
+		assertTrue(Anagram.isAnagram("ab", "ba"),"Expected: true");
 		points += 1;
 	}
 
@@ -54,8 +56,8 @@ public class AnagramTests {
 	 */
 	@Test
 	public void testAnagram4() {
-		assertFalse("Expected: false", Anagram.isAnagram("a", "b"));
-		assertTrue("Expected: true", Anagram.isAnagram("abc", "cba"));
+		assertFalse(Anagram.isAnagram("a", "b"),"Expected: false");
+		assertTrue(Anagram.isAnagram("abc", "cba"),"Expected: true");
 		points += 1;
 	}
 
@@ -64,8 +66,8 @@ public class AnagramTests {
 	 */
 	@Test
 	public void testAnagram5() {
-		assertFalse("Expected: false", Anagram.isAnagram("a", "b"));
-		assertTrue("Expected: true", Anagram.isAnagram("abc", "bca"));
+		assertFalse(Anagram.isAnagram("a", "b"),"Expected: false");
+		assertTrue(Anagram.isAnagram("abc", "bca"),"Expected: true");
 		points += 1;
 	}
 
@@ -74,15 +76,15 @@ public class AnagramTests {
 	 */
 	@Test
 	public void testAnagram6() {
-		assertFalse("Expected: false", Anagram.isAnagram("aabb", "bbbaa"));
-		assertTrue("Expected: true", Anagram.isAnagram("Claude Anderson", "Nuanced Ordeals"));
-		assertTrue("Expected: true", Anagram.isAnagram("Matt Boutell", "Total Tumble"));
-		assertTrue("Expected: true", Anagram.isAnagram("Nate Chenette", "Canteen Teeth"));
-		assertTrue("Expected: true", Anagram.isAnagram("Delvin Defoe", "Defend Olive")); // like Popeye!
-		assertTrue("Expected: true", Anagram.isAnagram("Dave Fisher", "Evader Fish"));
-		assertTrue("Expected: true", Anagram.isAnagram("Dave Mutchler", "Traveled Much"));
-		assertTrue("Expected: true", Anagram.isAnagram("  Wollowski", "Silk Owl Ow"));
-		assertFalse(Anagram.isAnagram("aabb", "aaab"));
+		assertFalse(Anagram.isAnagram("aabb", "bbbaa"),"Expected: false");
+		assertTrue(Anagram.isAnagram("Claude Anderson", "Nuanced Ordeals"),"Expected: true");
+		assertTrue(Anagram.isAnagram("Matt Boutell", "Total Tumble"),"Expected: true");
+		assertTrue(Anagram.isAnagram("Nate Chenette", "Canteen Teeth"),"Expected: true");
+		assertTrue(Anagram.isAnagram("Delvin Defoe", "Defend Olive"),"Expected: true"); // like Popeye!
+		assertTrue(Anagram.isAnagram("Dave Fisher", "Evader Fish"),"Expected: true");
+		assertTrue(Anagram.isAnagram("Dave Mutchler", "Traveled Much"),"Expected: true");
+		assertTrue(Anagram.isAnagram("  Wollowski", "Silk Owl Ow"),"Expected: true");
+		assertFalse(Anagram.isAnagram("aabb", "aaab"),"Expected: true");
 		points += 1.5;
 	}
 
@@ -91,11 +93,11 @@ public class AnagramTests {
 	 */
 	@Test
 	public void testAnagram7() {
-		assertTrue("Expected: true", Anagram.isAnagram("aabb", "bbaa"));
-		assertFalse("Expected: false", Anagram.isAnagram("Claude Anderson", "Nuanced  Ordeals"));
-		assertFalse("Expected: false", Anagram.isAnagram("MA", "LB"));
-		assertFalse("Expected: false", Anagram.isAnagram("ay", "bx"));
-		assertFalse("Expected: false", Anagram.isAnagram("ab", "c"));
+		assertTrue(Anagram.isAnagram("aabb", "bbaa"),"Expected: true");
+		assertFalse(Anagram.isAnagram("Claude Anderson", "Nuanced  Ordeals"),"Expected: false");
+		assertFalse(Anagram.isAnagram("MA", "LB"),"Expected: false");
+		assertFalse(Anagram.isAnagram("ay", "bx"),"Expected: false");
+		assertFalse(Anagram.isAnagram("ab", "c"),"Expected: false");
 		points += 1.5;
 	}
 	

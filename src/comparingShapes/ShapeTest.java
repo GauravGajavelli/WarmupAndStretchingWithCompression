@@ -1,13 +1,13 @@
 package comparingShapes;
 
-import static org.junit.Assert.assertEquals;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.TreeSet;
 
-import org.junit.AfterClass;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -181,7 +181,7 @@ public class ShapeTest {
 		points += 4;
 	}
 
-	@AfterClass
+	@AfterAll
 	public static void showPoints() {
 		System.out.printf("COMPARING SHAPES POINTS = %d of 10\n", points);
 	}

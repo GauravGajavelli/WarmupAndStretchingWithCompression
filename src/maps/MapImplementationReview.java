@@ -1,14 +1,14 @@
 package maps;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 import java.util.HashMap;
 
-import org.junit.AfterClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
 
 /**
  * Simple introduction or reminder about different kinds of maps.
@@ -59,7 +59,7 @@ public class MapImplementationReview {
 		points += 2;
 	}
 	
-	@AfterClass
+	@AfterAll
 	public static void showPoints() {
 		System.out.printf("MAPS-IMPLEMENTATIONS POINTS = %d of 2\n", points);
 	}

@@ -88,10 +88,15 @@ public class LoggingSingleton {
 //	static private final String tempFilepath = "src/testSupport/temp/";
 //	static private final String filepath = "src/testSupport/";
     public static Path tempFilepathResolve(Path toResolve) {
-    	return toResolve.resolve("src","testSupport","temp");
+    	return toResolve
+    			.resolve("src")
+    			.resolve("testSupport")
+    			.resolve("temp");
     }
     public static Path filepathResolve(Path toResolve) {
-    	return toResolve.resolve("src","testSupport");
+    	return toResolve
+    			.resolve("src")
+    			.resolve("testSupport");
     }
     public static Path tempFilepathResolve() {
     	return Paths.get("src","testSupport","temp");
@@ -120,21 +125,15 @@ public class LoggingSingleton {
     }
     
     public static int getCurrentTestRunNumber() {
-    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
-        int prevRunNumber = incremented.get("prevRunNumber").asInt();
-        return prevRunNumber;
+		return getJsonNode("prevRunNumber").asInt();
     }
     
     public static int getSeed() {
-    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
-        int randomSeed = incremented.get("randomSeed").asInt();
-        return randomSeed;
+		return getJsonNode("randomSeed").asInt();
     }
 
     public static boolean getEncryptDiffs() {
-    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
-        boolean encryptDiffs = incremented.get("encryptDiffs").asBoolean();
-        return encryptDiffs;
+		return getJsonNode("encryptDiffs").asBoolean();
     }
 
     public static String getTestFileName() {
@@ -146,15 +145,11 @@ public class LoggingSingleton {
     }
     
     public static boolean getRebaselining() {
-    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
-    	boolean rebaselining = added.get("rebaselining").asBoolean(); // it's already incremented, presumably
-    	return rebaselining;
+		return getJsonNode("rebaselining").asBoolean();
     }
     
     public static int getPreviousBaselineRunNumber () {
-		ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
-		int prevBaselineRunNumber = added.get("prevBaselineRunNumber").asInt(); // it's already incremented, presumably
-		return prevBaselineRunNumber;
+		return getJsonNode("prevBaselineRunNumber").asInt();
     }
    
     public static long getFileSizes() {
@@ -173,13 +168,15 @@ public class LoggingSingleton {
 
         return ignoreReason == FileIgnoreReasons.TOO_LARGE;
     }
-    
+
     public static boolean getSkipLogging() {
-    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
-    	boolean skipLogging = added.get("skipLogging").asBoolean(); // it's already incremented, presumably
-    	return skipLogging;
+    	return getJsonNode("skipLogging").asBoolean();
     }
-    
+
+    private static JsonNode getJsonNode(String name) {
+        return ((ObjectNode)LoggingSingleton.testRunInfo).get(name);
+    }
+
     private static ObjectNode getOrCreateObjectNode(ObjectNode parent, String nodeName) {
         JsonNode existingNode = parent.get(nodeName);
         ObjectNode toRet;
@@ -194,22 +191,6 @@ public class LoggingSingleton {
         }
         return toRet;
     }
-
-    private static ArrayNode getOrCreateArrayNode(ObjectNode parent, String nodeName) {
-        JsonNode existingNode = parent.get(nodeName);
-        ArrayNode toRet;
-        
-        // get/create the test file node
-        if (existingNode == null) {
-            // Create it if missing
-            toRet = objectMapper.createArrayNode();
-            parent.set(nodeName, toRet);
-        } else {
-            toRet = (ArrayNode) existingNode;
-        }
-        return toRet;
-    }
-
 
     //================================================================================
     // Setters

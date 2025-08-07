@@ -1,11 +1,14 @@
 package list;
 
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.NoSuchElementException;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import testSupport.LoggingExtension;
@@ -28,7 +31,7 @@ public class DoublyLinkedListTest {
 	 * 
 	 * @throws java.lang.Exception
 	 */
-	@Before
+	@BeforeEach
 	public void setUp() throws Exception {
 		this.empty = new DoublyLinkedList<String>();
 
@@ -105,19 +108,19 @@ public class DoublyLinkedListTest {
 	/**
 	 * Test method for {@link list.DoublyLinkedList#removeFirst()}.
 	 */
-	@Test(expected = NoSuchElementException.class)
-	public void testRemoveFirst5() {
-		this.empty.removeFirst();
-	}
+	@Test
+    void testRemoveFirst5() {
+        assertThrows(NoSuchElementException.class, () -> empty.removeFirst());
+    }
 
 	/**
 	 * Test method for {@link list.DoublyLinkedList#iterator()}.
 	 */
-	@Test(expected = NoSuchElementException.class)
-	public void testIterator1() {
-		DLLIterator<String> iter = this.empty.iterator();
-		iter.next();
-	}
+	@Test
+    void testIterator1() {
+        DLLIterator<String> iter = empty.iterator();
+        assertThrows(NoSuchElementException.class, iter::next);
+    }
 
 	/**
 	 * Test method for {@link list.DoublyLinkedList#iterator()}.
