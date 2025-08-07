@@ -475,7 +475,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     			int testRunNumber, int seed, boolean encryptDiffs) throws DiffException, IOException {
     		// Create this path if it didn't exist: testSupport/diffs/patches/filename
     		String toWriteName = fileName + "_" + testRunNumber;
-    		Path toWritePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve("diffs","patches",packageName + "." + toWriteName);
+    		Path toWritePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory)
+    				.resolve("diffs")
+    				.resolve("patches")
+    				.resolve(packageName + "." + toWriteName);
     		String diffString;
     		if (fileIsOrWasLargerThan(sourcePath, MB_SIZE) || fileIsOrWasLargerThan(revisedPath, MB_SIZE)) {
     			diffString = "File too large!";
@@ -573,7 +576,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     			            Path baselineFilePath = 
     			            		LoggingSingleton
     			            		.filepathResolve(LoggingSingleton.tempDirectory)
-    			            		.resolve("diffs","baselines", packageName + "." + fileNameNoJava + "_" + previousBaselineRunNumber); // final file
+    			            		.resolve("diffs")
+    			            		.resolve("baselines")
+    			            		.resolve(packageName + "." + fileNameNoJava + "_" + previousBaselineRunNumber); // final file
 
     			            if (Files.exists(baselineFilePath) && !rebaselining) { // the file already exists, diff it
 //    			            	System.out.println("Baseline exists");
@@ -598,15 +603,16 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	    			                	// Write baseline
 	    			                	writeContents(baselineFilePath, fileName, sourceContents);
 	    			                	
-	    			                	if (!rebaselining) {
-		    			                	// Write creation patch
-		    			                	String fileCreated = "File created!";
-		    			                	String toWriteName = fileNameNoJava + "_" + testRunNumber;
-		    			                	Path toWritePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve("diffs","patches",packageName + "." + toWriteName);
-		    			                	Files.createDirectories(toWritePath.getParent());
-		    			                	long sizeWritten = writeContents(toWritePath,toWriteName+".java",fileCreated);
-		    			                	LoggingSingleton.increaseFileSizes(sizeWritten);
-	    			                	}
+    			                		// Write creation patch; runs every time, first one being the true time
+	    			                	String fileCreated = "File created!";
+	    			                	String toWriteName = fileNameNoJava + "_" + testRunNumber;
+	    			                	Path toWritePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory)
+	    			                			.resolve("diffs")
+	    			                			.resolve("patches")
+	    			                			.resolve(packageName + "." + toWriteName);
+	    			                	Files.createDirectories(toWritePath.getParent());
+	    			                	long sizeWritten = writeContents(toWritePath,toWriteName+".java",fileCreated);
+	    			                	LoggingSingleton.increaseFileSizes(sizeWritten);
     			                	}
 	    			    	    } catch (IOException e) { 
 	    			    	    	throw new UncheckedIOException(e);
