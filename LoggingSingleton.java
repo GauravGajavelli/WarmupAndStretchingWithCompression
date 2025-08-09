@@ -7,16 +7,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
@@ -48,8 +53,9 @@ public class LoggingSingleton {
 	static private final String testRunInfoFilename = "testRunInfo.json";
 	static private final String errorLogFilename = "error-logs.txt";
 	static private final String finalTarFilename = "run.tar";
-	static private final String diffsTarFilename = "diffs.tar";
-	static private final String diffsTarZipFilename = "diffs.tar.zip";
+	static private final String diffsPrefix = "diffs";
+	static private final String tarSuffix = ".tar";
+	static private final String tarZipSuffix = ".tar.zip";
 
     // Static instance of the singleton class
     private static LoggingSingleton instance;
@@ -144,12 +150,8 @@ public class LoggingSingleton {
         return LoggingSingleton.testFilePackageName;
     }
     
-    public static boolean getRebaselining() {
+    public static boolean isRebaselining() {
 		return getJsonNode("rebaselining").asBoolean();
-    }
-    
-    public static int getPreviousBaselineRunNumber () {
-		return getJsonNode("prevBaselineRunNumber").asInt();
     }
    
     public static long getFileSizes() {
@@ -173,6 +175,18 @@ public class LoggingSingleton {
     	return getJsonNode("skipLogging").asBoolean();
     }
 
+    public static String getDiffsTarFilename() {
+    	return diffsPrefix+"_"+LoggingSingleton.getPreviousBaselineRunNumber()+"_"+tarSuffix;
+    }
+    
+    public static String getDiffsTarZipFilename() {
+    	return diffsPrefix+"_"+LoggingSingleton.getPreviousBaselineRunNumber()+"_"+tarZipSuffix;
+    }
+    
+    public static boolean isDiffsTarZipFilename(String filename) {
+    	return filename.startsWith(diffsPrefix) && filename.endsWith(tarZipSuffix);
+    }
+
     private static JsonNode getJsonNode(String name) {
         return ((ObjectNode)LoggingSingleton.testRunInfo).get(name);
     }
@@ -190,6 +204,10 @@ public class LoggingSingleton {
             toRet = (ObjectNode) existingNode;
         }
         return toRet;
+    }
+    
+    private static int getPreviousBaselineRunNumber () {
+		return getJsonNode("prevBaselineRunNumber").asInt();
     }
 
     //================================================================================
@@ -292,7 +310,7 @@ public class LoggingSingleton {
     }
     
     //================================================================================
-    // File Utilities
+    // Diff Update/Error Logging Shared Methods
     //================================================================================
 
 	// note that this is gets rid of the outermost folder surrounding the tar
@@ -308,10 +326,6 @@ public class LoggingSingleton {
 	        while ((entry = tIn.getNextTarEntry()) != null) {
 
 	            Path outPath = targetPath.resolve(entry.getName()).normalize();
-	            // System.out.println("Untarred: "+outPath);
-	            /* Security guard: prevent "../../etc/passwd"–style entries
-	             * from escaping the intended extraction root.
-	             */
 	            if (!outPath.startsWith(targetPath)) {
 	                throw new IOException("Illegal TAR entry: " + entry.getName());
 	            }
@@ -324,7 +338,7 @@ public class LoggingSingleton {
 	                try (OutputStream o = Files.newOutputStream(outPath, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE)) {
 	                    IOUtils.copy(tIn, o);         // stream file bytes
 	                }
-	                // Preserve timestamp; add other metadata here if you like
+
 	                FileTime mtime = FileTime.fromMillis(entry.getModTime().getTime());
 	                Files.setLastModifiedTime(outPath, mtime);
 	            }
@@ -341,27 +355,32 @@ public class LoggingSingleton {
 		Path tempTargetTar = LoggingSingleton
 				.tempFilepathResolve(LoggingSingleton.tempDirectory)
 				.resolve(finalTarFilename);
-		List<String> tempFiles = new ArrayList<>();
-		tempFiles.add(diffsTarZipFilename);
+		Path tempDirectoryPath = LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory);
+
+		Set<String> tempFiles = new HashSet<>();
 		tempFiles.add(errorLogFilename);
-		tempFiles.add(testRunInfoFilename); // Moved to first in list increase readability
-		
-		try (OutputStream fOut = Files.newOutputStream(tempTargetTar); // no StandardOpenOption.CREATE; should fail
+		tempFiles.add(testRunInfoFilename); // Move to first in list increase readability
+
+		try (OutputStream fOut = Files.newOutputStream(tempTargetTar);
 		     BufferedOutputStream bOut = new BufferedOutputStream(fOut);
 		     TarArchiveOutputStream tOut = new TarArchiveOutputStream(bOut)) {
-
-		    tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-		    for (String file:tempFiles) {
-		    	Path p = LoggingSingleton
-	    				.tempFilepathResolve(LoggingSingleton.tempDirectory)
-	    				.resolve(file);
-		    	if (Files.exists(p)) {
-	                 TarArchiveEntry entry = new TarArchiveEntry(p.toFile(), file);
-	                 tOut.putArchiveEntry(entry);
-	                 Files.copy(p, tOut);
-	                 tOut.closeArchiveEntry();
-		    	}
-		    }
+		    
+			tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+		    
+    		Files.walkFileTree(tempDirectoryPath, new SimpleFileVisitor<Path>() {
+    		    @Override
+    		    public FileVisitResult visitFile(Path p, BasicFileAttributes attrs) throws IOException {
+    		    	String fileName = p.getFileName().toString();
+    		    	if (tempFiles.contains(fileName) || isDiffsTarZipFilename(fileName)) {
+	   	                 TarArchiveEntry entry = new TarArchiveEntry(p.toFile(), fileName);
+	   	                 tOut.putArchiveEntry(entry);
+	   	                 Files.copy(p, tOut);
+	   	                 tOut.closeArchiveEntry();
+    		    	}
+    		        return FileVisitResult.CONTINUE;
+    		    }
+    		});
+			
 		    
 		    Files.move(tempTargetTar,targetTar,
 		            StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
@@ -432,10 +451,10 @@ public class LoggingSingleton {
    	    	untarFile(filesDir, tarPath);
 //   	    	System.out.print(tempDirectory);
     		Files.write(
-    				errorFilepath,               // the target file
-    			    List.of(message), 			 // data (Iterable<String> or byte[])
-    			    StandardOpenOption.CREATE,   // create the file if it’s missing
-    			    StandardOpenOption.APPEND    // move the write cursor to the end
+    				errorFilepath,
+    			    List.of(message),
+    			    StandardOpenOption.CREATE,
+    			    StandardOpenOption.APPEND
     			);
     		atomicallySaveTempFiles();
     	} catch (Throwable T) {
