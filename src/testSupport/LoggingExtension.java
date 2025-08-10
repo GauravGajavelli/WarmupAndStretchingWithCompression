@@ -58,7 +58,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	static private final String finalTarFilename = "run.tar";
 	static private final String errorLogFilename = "error-logs.txt";
 	static private final long MB_SIZE = 1024 * 1024;   // 1 MiB
-	static private final long MAX_TIME = 500; // in milliseconds
+	static private final long KB_SIZE = 1024;   // 1 MiB
+	static private final long OPEN_MAX_TIME = 500; // in milliseconds
+	static private final long CLOSE_MAX_TIME = 3000; // in milliseconds
 
     //================================================================================
     // Public Methods (Only JUnit Callbacks)
@@ -93,7 +95,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	        
 	        LoggingSingleton.setCurrentTestFilePath(testFileName, packageName);
 //    		int l = 5/0; // For error injection
-	        accumulateAndCheckTiming();
+	        accumulateAndCheckTiming(OPEN_MAX_TIME);
     	} catch (Throwable T) {
     		LoggingSingleton.logError(T);
     	}
@@ -102,7 +104,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
 	public void beforeEach(ExtensionContext arg0) throws Exception {
 		try {
-			setUpAndCheckTiming();
+			setUpAndCheckTiming(OPEN_MAX_TIME);
     		
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
@@ -118,7 +120,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	
 	        LoggingSingleton.setTestRunNumberAndStatus(testFileName, testName, TestStatus.ABORTED); // aborted by default
 	
-	        accumulateAndCheckTiming();
+	        accumulateAndCheckTiming(OPEN_MAX_TIME);
     	} catch (Throwable T) {
        		LoggingSingleton.logError(T);
     	}
@@ -127,14 +129,14 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
 	public void testAborted(ExtensionContext ctx, Throwable cause) {
 		try {
-			setUpAndCheckTiming();
+			setUpAndCheckTiming(OPEN_MAX_TIME);
 	        
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.ABORTED, cause);
 
-	        accumulateAndCheckTiming();
+	        accumulateAndCheckTiming(OPEN_MAX_TIME);
 		} catch (Throwable T) {
     		LoggingSingleton.logError(T);
 		}
@@ -143,14 +145,14 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	
 	public void testDisabled(ExtensionContext ctx) { 
 		try {
-			setUpAndCheckTiming();
+			setUpAndCheckTiming(OPEN_MAX_TIME);
 
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			}
 		    setTestRunNumberAndStatusHelper(ctx, TestStatus.DISABLED);
 	
-		    accumulateAndCheckTiming();
+		    accumulateAndCheckTiming(OPEN_MAX_TIME);
 		} catch (Throwable T) {
 			LoggingSingleton.logError(T);
 		}
@@ -160,14 +162,14 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
 	public void testFailed(ExtensionContext ctx, Throwable cause) {
 		try {
-			setUpAndCheckTiming();
+			setUpAndCheckTiming(OPEN_MAX_TIME);
 
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.FAILED, cause);
 
-	        accumulateAndCheckTiming();
+	        accumulateAndCheckTiming(OPEN_MAX_TIME);
     	} catch (Throwable T) {
     		LoggingSingleton.logError(T);
     	}
@@ -177,14 +179,14 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
 	public void testSuccessful(ExtensionContext ctx) {
 		try {
-			setUpAndCheckTiming();
+			setUpAndCheckTiming(OPEN_MAX_TIME);
 
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.SUCCESSFUL);
 			
-			accumulateAndCheckTiming();
+			accumulateAndCheckTiming(OPEN_MAX_TIME);
     	} catch (Throwable T) {
     		LoggingSingleton.logError(T);
     	}
@@ -193,8 +195,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	// Final method run
     public void close() {
 		try {
-			setUpAndCheckTiming();
-
+			setUpAndCheckTiming(CLOSE_MAX_TIME);
+//			Thread.sleep(10000);
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			}
@@ -216,12 +218,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 		    Files.move(oldErrorLogsFilePath,newErrorLogsFilePath,
 		            StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
 
-		    // Do the timing check here, since it's the latest before saving testRunInfo
-		    if (LoggingSingleton.getCurrentTotalElapsedTime() > MAX_TIME) {
-		    	LoggingSingleton.addStrike();
-		    }
-		    
-		    accumulateAndCheckTiming(); // not timing
+		    accumulateAndCheckTiming(CLOSE_MAX_TIME); // not timing
 			
 		    saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo());
 			LoggingSingleton.atomicallySaveTempFiles();
@@ -322,27 +319,26 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	    // Timing Checks
 	    //================================================================================
 
-		private void setUpAndCheckTiming() {
+		private void setUpAndCheckTiming(long time) {
     		LoggingSingleton.restartTiming();
-    		checkTiming();
+    		checkTiming(time);
 		}
 
-        private void accumulateAndCheckTiming() {
+        private void accumulateAndCheckTiming(long time) {
 	        LoggingSingleton.accumulateTime();
-	        checkTiming();
+	        checkTiming(time);
         }
 
-        private void checkTiming() {
+        private void checkTiming(long time) {
     		long timeElapsed = LoggingSingleton.getCurrentTotalElapsedTime();
 
-    		if (timeElapsed > MAX_TIME) {
+    		if (timeElapsed > time) {
     			LoggingSingleton.addStrike();
     		}
 
     		boolean tooManyStrikes = LoggingSingleton.tooManyStrikes();
-    		if (tooManyStrikes || (timeElapsed > 5*MAX_TIME)) {
+    		if (tooManyStrikes || (timeElapsed > 5*time)) {
     			LoggingSingleton.setSkipLogging(true);
-    			throw new Error("Taking way too long: "+timeElapsed+" ms. Last Strike? " + tooManyStrikes);
     		}
         }
 		
@@ -644,7 +640,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
     			LoggingSingleton.setRebaselining(false);
     			// limiting total patch size/checking for potential rebaselining
-    			if (getFilesSize(tempDiffsFolder.resolve("patches")) > (2*MB_SIZE)) {
+    			if (getFilesSize(tempDiffsFolder.resolve("patches")) > (10*KB_SIZE)) {
     				LoggingSingleton.setRebaselining(true);
     			}
     	}
