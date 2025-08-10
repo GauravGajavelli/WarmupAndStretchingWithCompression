@@ -20,8 +20,10 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
@@ -33,29 +35,35 @@ import java.time.LocalTime;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class LoggingSingleton {
-	
+
     //================================================================================
     // Properties
     //================================================================================
-	
+
+	static public Path tempDirectory;
+
 	static private String timestamp;
 	static private ObjectMapper objectMapper;
 	static private JsonNode testRunInfo;
 	static private String testFileName; // Works off of the assumption of one test per logger
 	static private String testFilePackageName;
-	static public Path tempDirectory;
 	static private boolean loggedInitialError;
 	static private long fileSizes;
-	
+	static private Long startTime;
+	static private long accumulatedTime = 0;
+
 	static private final String testRunInfoFilename = "testRunInfo.json";
 	static private final String errorLogFilename = "error-logs.txt";
 	static private final String finalTarFilename = "run.tar";
 	static private final String diffsPrefix = "diffs";
 	static private final String tarSuffix = ".tar";
 	static private final String tarZipSuffix = ".tar.zip";
+	static private final int TIME_CHECK_WINDOW_SIZE = 3;
+	static private final int MAX_STRIKES = 2;
 
     // Static instance of the singleton class
     private static LoggingSingleton instance;
@@ -80,37 +88,36 @@ public class LoggingSingleton {
 	    	createSeedIfNotInitialized();
 		}
     }
-    
+
     //================================================================================
-    // Helpers
+    // File Utilities
     //================================================================================
 
     public static void initTempDirectory() throws IOException {
 		LoggingSingleton.tempDirectory = Files.createTempDirectory("temp");
-		// System.out.println("New temp directory: "+tempDirectory);
     }
 
-    // These replace the following for all OS's
-//	static private final String tempFilepath = "src/testSupport/temp/";
-//	static private final String filepath = "src/testSupport/";
     public static Path tempFilepathResolve(Path toResolve) {
     	return toResolve
     			.resolve("src")
     			.resolve("testSupport")
     			.resolve("temp");
     }
+
     public static Path filepathResolve(Path toResolve) {
     	return toResolve
     			.resolve("src")
     			.resolve("testSupport");
     }
+
     public static Path tempFilepathResolve() {
     	return Paths.get("src","testSupport","temp");
     }
+
     public static Path filepathResolve() {
     	return Paths.get("src","testSupport");
     }
-    
+
     //================================================================================
     // Getters
     //================================================================================
@@ -182,9 +189,34 @@ public class LoggingSingleton {
     public static String getDiffsTarZipFilename() {
     	return diffsPrefix+"_"+LoggingSingleton.getPreviousBaselineRunNumber()+"_"+tarZipSuffix;
     }
-    
+
     public static boolean isDiffsTarZipFilename(String filename) {
     	return filename.startsWith(diffsPrefix) && filename.endsWith(tarZipSuffix);
+    }
+
+    public static long getCurrentTotalElapsedTime() { // in milliseconds
+    	return TimeUnit.NANOSECONDS.toMillis(
+    					LoggingSingleton.accumulatedTime+(System.nanoTime()-LoggingSingleton.startTime));
+    }
+
+    public static boolean tooManyStrikes() {
+    	int numStrikes = 0;
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+
+        ObjectNode strikesNode = getOrCreateObjectNode(added, "strikes");
+        
+        Iterator<String> iter = strikesNode.fieldNames();
+        while (iter.hasNext()) {
+        	int dex = Integer.parseInt(iter.next());
+        	if (0 <= dex && dex <= TIME_CHECK_WINDOW_SIZE) {
+                boolean didStrike = strikesNode.get(Integer.toString(dex)).asBoolean();
+                if (didStrike) {
+                	numStrikes++;
+                }
+        	}
+        }
+
+    	return numStrikes >= MAX_STRIKES;
     }
 
     private static JsonNode getJsonNode(String name) {
@@ -192,6 +224,7 @@ public class LoggingSingleton {
     }
 
     private static ObjectNode getOrCreateObjectNode(ObjectNode parent, String nodeName) {
+
         JsonNode existingNode = parent.get(nodeName);
         ObjectNode toRet;
         
@@ -205,7 +238,7 @@ public class LoggingSingleton {
         }
         return toRet;
     }
-    
+
     private static int getPreviousBaselineRunNumber () {
 		return getJsonNode("prevBaselineRunNumber").asInt();
     }
@@ -287,6 +320,7 @@ public class LoggingSingleton {
 
         ObjectNode toIgnoreNode = getOrCreateObjectNode(added, "toIgnore");
         toIgnoreNode.put(toAdd.toString(),FileIgnoreReasons.TOO_LARGE.toString());
+        LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
     
     public static void setRebaselining(boolean isRebaselining) {
@@ -305,10 +339,40 @@ public class LoggingSingleton {
     
     public static void setSkipLogging(boolean skipLogging) {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
-        incremented.put("skipLoggins", skipLogging);
+        incremented.put("skipLogging", skipLogging);
     	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
     }
+
+    public static void restartTiming() {
+    	LoggingSingleton.startTime = System.nanoTime();
+    }
+
+    public static void accumulateTime() {
+    	if (LoggingSingleton.startTime == null) {
+    		throw new Error("Cannot accumulate time; never started timing");
+    	}
+    	LoggingSingleton.accumulatedTime += System.nanoTime()-LoggingSingleton.startTime;
+    }
+
+    public static void addStrike() {
+    	updateCurrentStrikeIndex(true);
+    }
     
+    
+    public static void removeOldStrike() {
+    	updateCurrentStrikeIndex(false);
+    }
+    
+    private static void updateCurrentStrikeIndex(boolean struck) {
+    	int currentEntryIndex = LoggingSingleton.getCurrentTestRunNumber() % TIME_CHECK_WINDOW_SIZE;
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+
+        ObjectNode strikesNode = getOrCreateObjectNode(added, "strikes");
+        strikesNode.put(Integer.toString(currentEntryIndex),struck);
+
+    	LoggingSingleton.testRunInfo = ((JsonNode)(added));
+    }
+
     //================================================================================
     // Diff Update/Error Logging Shared Methods
     //================================================================================
@@ -427,6 +491,8 @@ public class LoggingSingleton {
 	// Essentially makes a last-ditch effort to log things properly
     public static void logError(Throwable throwable) {
     	try {
+	        LoggingSingleton.accumulateTime(); // all publics throwing this will have already started time
+    		
     		String message = generateMessage(throwable);
 //    		 System.out.println("\n ERROR: "+message);
     		if (loggedInitialError) {

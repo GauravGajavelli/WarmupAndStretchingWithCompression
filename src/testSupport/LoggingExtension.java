@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -57,6 +58,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	static private final String finalTarFilename = "run.tar";
 	static private final String errorLogFilename = "error-logs.txt";
 	static private final long MB_SIZE = 1024 * 1024;   // 1 MiB
+	static private final long MAX_TIME = 500; // in milliseconds
 
     //================================================================================
     // Public Methods (Only JUnit Callbacks)
@@ -65,6 +67,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
     public void beforeAll(ExtensionContext ctx) {
     	try {
+    		LoggingSingleton.restartTiming();
+    		
     		if ((getRepoFilesSize() > (10L * MB_SIZE)) || tarTooBig()) {
     			LoggingSingleton.setSkipLogging(true);
     			return;
@@ -78,6 +82,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 				String testClassName = ctx.getDisplayName();
 		    	LoggingSingleton.incrementRunNumber();
 		    	LoggingSingleton.addRunTime();
+		    	
+		    	LoggingSingleton.removeOldStrike();
 	
 		    	loggerInitialized = true;
 	    	}
@@ -87,7 +93,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	        
 	        LoggingSingleton.setCurrentTestFilePath(testFileName, packageName);
 //    		int l = 5/0; // For error injection
-	        
+	        accumulateAndCheckTiming();
     	} catch (Throwable T) {
     		LoggingSingleton.logError(T);
     	}
@@ -96,20 +102,23 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
 	public void beforeEach(ExtensionContext arg0) throws Exception {
 		try {
+			setUpAndCheckTiming();
+    		
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			}
         // Get the test method name
-        String testName = arg0.getDisplayName();
-
-        // Get the test class
-        Class<?> testClass = arg0.getTestClass()
-            .orElseThrow(() -> new IllegalStateException("No test class"));
-
-        String testFileName = testClass.getSimpleName();
-
-        LoggingSingleton.setTestRunNumberAndStatus(testFileName, testName, TestStatus.ABORTED); // aborted by default
-        
+	        String testName = arg0.getDisplayName();
+	
+	        // Get the test class
+	        Class<?> testClass = arg0.getTestClass()
+	            .orElseThrow(() -> new IllegalStateException("No test class"));
+	
+	        String testFileName = testClass.getSimpleName();
+	
+	        LoggingSingleton.setTestRunNumberAndStatus(testFileName, testName, TestStatus.ABORTED); // aborted by default
+	
+	        accumulateAndCheckTiming();
     	} catch (Throwable T) {
        		LoggingSingleton.logError(T);
     	}
@@ -118,12 +127,14 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
 	public void testAborted(ExtensionContext ctx, Throwable cause) {
 		try {
+			setUpAndCheckTiming();
+	        
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.ABORTED, cause);
 
-
+	        accumulateAndCheckTiming();
 		} catch (Throwable T) {
     		LoggingSingleton.logError(T);
 		}
@@ -132,25 +143,31 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	
 	public void testDisabled(ExtensionContext ctx) { 
 		try {
+			setUpAndCheckTiming();
+
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			}
-	    setTestRunNumberAndStatusHelper(ctx, TestStatus.DISABLED);
-	    
-	} catch (Throwable T) {
-		LoggingSingleton.logError(T);
-	}
+		    setTestRunNumberAndStatusHelper(ctx, TestStatus.DISABLED);
+	
+		    accumulateAndCheckTiming();
+		} catch (Throwable T) {
+			LoggingSingleton.logError(T);
+		}
 
     }
     
 	@Override
 	public void testFailed(ExtensionContext ctx, Throwable cause) {
 		try {
+			setUpAndCheckTiming();
+
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.FAILED, cause);
-	    
+
+	        accumulateAndCheckTiming();
     	} catch (Throwable T) {
     		LoggingSingleton.logError(T);
     	}
@@ -160,10 +177,14 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
 	public void testSuccessful(ExtensionContext ctx) {
 		try {
+			setUpAndCheckTiming();
+
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.SUCCESSFUL);
+			
+			accumulateAndCheckTiming();
     	} catch (Throwable T) {
     		LoggingSingleton.logError(T);
     	}
@@ -172,6 +193,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	// Final method run
     public void close() {
 		try {
+			setUpAndCheckTiming();
+
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			}
@@ -193,14 +216,26 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 		    Files.move(oldErrorLogsFilePath,newErrorLogsFilePath,
 		            StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
 
-			saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo());
+		    // Do the timing check here, since it's the latest before saving testRunInfo
+		    if (LoggingSingleton.getCurrentTotalElapsedTime() > MAX_TIME) {
+		    	LoggingSingleton.addStrike();
+		    }
+		    
+		    accumulateAndCheckTiming(); // not timing
+			
+		    saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo());
 			LoggingSingleton.atomicallySaveTempFiles();
+
+			/* Any failure beyond this point will not be error logged properly due to the 
+			 * files already being saved */
 
 			// Delete intermediates
 			Files.walk(logger.tempDirectory)
 		     .sorted(Comparator.reverseOrder())
 		     .map(Path::toFile)
 		     .forEach(File::delete);
+
+			// Timing check above saving test run info; otherwise strikes won't be updated
 		} catch (Throwable T) {
 			LoggingSingleton.logError(T);
 		}
@@ -282,7 +317,35 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 		private long getUncompressedDiffSize() throws IOException {
 			return getFilesSize(LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve("diffs"));
 		}        
-        
+
+		//================================================================================
+	    // Timing Checks
+	    //================================================================================
+
+		private void setUpAndCheckTiming() {
+    		LoggingSingleton.restartTiming();
+    		checkTiming();
+		}
+
+        private void accumulateAndCheckTiming() {
+	        LoggingSingleton.accumulateTime();
+	        checkTiming();
+        }
+
+        private void checkTiming() {
+    		long timeElapsed = LoggingSingleton.getCurrentTotalElapsedTime();
+
+    		if (timeElapsed > MAX_TIME) {
+    			LoggingSingleton.addStrike();
+    		}
+
+    		boolean tooManyStrikes = LoggingSingleton.tooManyStrikes();
+    		if (tooManyStrikes || (timeElapsed > 5*MAX_TIME)) {
+    			LoggingSingleton.setSkipLogging(true);
+    			throw new Error("Taking way too long: "+timeElapsed+" ms. Last Strike? " + tooManyStrikes);
+    		}
+        }
+		
     	//================================================================================
         // File Utilities
         //================================================================================
@@ -580,8 +643,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
         		}
 
     			LoggingSingleton.setRebaselining(false);
-    			// limiting total diff size/checking for potential rebaselining
-    			if (getFilesSize(tempDiffsFolder) > (2*MB_SIZE)) {
+    			// limiting total patch size/checking for potential rebaselining
+    			if (getFilesSize(tempDiffsFolder.resolve("patches")) > (2*MB_SIZE)) {
     				LoggingSingleton.setRebaselining(true);
     			}
     	}
