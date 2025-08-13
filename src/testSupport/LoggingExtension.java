@@ -53,14 +53,12 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 	private LoggingSingleton logger;
 	static private boolean loggerInitialized = false;
-	static private final String testRunInfoFilename = "testRunInfo.json";
-	static private final String startTestRunInfoFilename  = "startTestRunInfo.json";
-	static private final String finalTarFilename = "run.tar";
-	static private final String errorLogFilename = "error-logs.txt";
+
 	static private final long MB_SIZE = 1024 * 1024;   // 1 MiB
 	static private final long KB_SIZE = 1024;   // 1 MiB
 	static private final long OPEN_MAX_TIME = 500; // in milliseconds
 	static private final long CLOSE_MAX_TIME = 3000; // in milliseconds
+	static private final long WAY_TOO_LONG_FACTOR = 3;
 
     //================================================================================
     // Public Methods (Only JUnit Callbacks)
@@ -77,6 +75,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     		}
 
 	    	if (!loggerInitialized) {
+	    		
 	    		initLogger(); // gets invalid
 		        Runtime.getRuntime().addShutdownHook(new Thread(this::close));
 
@@ -213,8 +212,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 			addPriorRebaslinedDiffs();
 
 			// Copies over unchanged error logs
-			Path oldErrorLogsFilePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(errorLogFilename);
-			Path newErrorLogsFilePath = LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory).resolve(errorLogFilename);
+			Path oldErrorLogsFilePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(LoggingSingleton.errorLogFilename);
+			Path newErrorLogsFilePath = LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory).resolve(LoggingSingleton.errorLogFilename);
 		    Files.move(oldErrorLogsFilePath,newErrorLogsFilePath,
 		            StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
 
@@ -225,7 +224,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 			/* Any failure beyond this point will not be error logged properly due to the 
 			 * files already being saved */
-
+			
 			// Delete intermediates
 			Files.walk(logger.tempDirectory)
 		     .sorted(Comparator.reverseOrder())
@@ -253,17 +252,17 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	    	// This line is needed now that temp dirs are being used; nothing exists yet
 	    	Files.createDirectories(LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory));
 	    	Path filesDir = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory);
-	    	Path tarPath  = LoggingSingleton.filepathResolve().resolve(finalTarFilename);
+	    	Path tarPath  = LoggingSingleton.filepathResolve().resolve(LoggingSingleton.finalTarFilename);
 
 	    	LoggingSingleton.untarFile(filesDir, tarPath);
-	    	Path testRunInfoPath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(testRunInfoFilename);
-    		Path errorLogFilePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(errorLogFilename);
+	    	Path testRunInfoPath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(LoggingSingleton.testRunInfoFilename);
+    		Path errorLogFilePath = LoggingSingleton.filepathResolve(LoggingSingleton.tempDirectory).resolve(LoggingSingleton.errorLogFilename);
             if (Files.notExists(errorLogFilePath)) {
             	Files.createFile(errorLogFilePath);                      // = CREATE_NEW
             }
 	    	if (Files.notExists(testRunInfoPath)) {
 				Files.copy(
-						LoggingSingleton.filepathResolve().resolve(startTestRunInfoFilename),
+						LoggingSingleton.filepathResolve().resolve(LoggingSingleton.startTestRunInfoFilename),
 						testRunInfoPath,
 				        StandardCopyOption.REPLACE_EXISTING);
 	    	}
@@ -301,7 +300,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	    //================================================================================
 
 		private boolean tarTooBig() throws IOException {
-		    Path tarPath  = LoggingSingleton.filepathResolve().resolve(finalTarFilename);
+		    Path tarPath  = LoggingSingleton.filepathResolve().resolve(LoggingSingleton.finalTarFilename);
 		    long size = 10L * MB_SIZE;
 		    return fileLargerThan(tarPath, size);
 		}
@@ -337,7 +336,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     		}
 
     		boolean tooManyStrikes = LoggingSingleton.tooManyStrikes();
-    		if (tooManyStrikes || (timeElapsed > 5*time)) {
+    		if (tooManyStrikes || (timeElapsed > WAY_TOO_LONG_FACTOR*time)) {
     			LoggingSingleton.setSkipLogging(true);
     		}
         }
@@ -549,6 +548,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     		                Files.createDirectories(outPath);
     		            } else {
     		                Files.createDirectories(outPath.getParent());
+
     		                try (OutputStream o = Files.newOutputStream(outPath, 
     		    	                StandardOpenOption.CREATE,
     		    	                StandardOpenOption.TRUNCATE_EXISTING)) {
@@ -639,6 +639,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
         		}
 
     			LoggingSingleton.setRebaselining(false);
+    			
     			// limiting total patch size/checking for potential rebaselining
     			if (getFilesSize(tempDiffsFolder.resolve("patches")) > (10*KB_SIZE)) {
     				LoggingSingleton.setRebaselining(true);
@@ -680,7 +681,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	private static void saveTestRunInfo(ObjectMapper objectMapper, JsonNode testRunInfo) throws StreamWriteException, DatabindException, IOException {
     		File testRunInfoFile = LoggingSingleton
     				.tempFilepathResolve(LoggingSingleton.tempDirectory)
-    				.resolve(testRunInfoFilename).toFile();
+    				.resolve(LoggingSingleton.testRunInfoFilename).toFile();
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(testRunInfoFile, testRunInfo);
     	}
     	
