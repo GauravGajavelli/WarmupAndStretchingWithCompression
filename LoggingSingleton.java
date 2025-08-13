@@ -3,6 +3,7 @@ package testSupport;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -22,7 +23,10 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -56,12 +60,14 @@ public class LoggingSingleton {
 	static private Long startTime;
 	static private long accumulatedTime = 0;
 
-	static private final String testRunInfoFilename = "testRunInfo.json";
-	static private final String errorLogFilename = "error-logs.txt";
-	static private final String finalTarFilename = "run.tar";
-	static private final String diffsPrefix = "diffs";
-	static private final String tarSuffix = ".tar";
-	static private final String tarZipSuffix = ".tar.zip";
+	static final String testRunInfoFilename = "testRunInfo.json";
+	static final String startTestRunInfoFilename  = "startTestRunInfo.json";
+	static final String errorLogFilename = "error-logs.txt";
+	static final String finalTarFilename = "run.tar";
+	static final String diffsPrefix = "diffs";
+	static final String tarSuffix = ".tar";
+	static final String tarZipSuffix = ".tar.zip";	
+
 	static private final int TIME_CHECK_WINDOW_SIZE = 3;
 	static private final int MAX_STRIKES = 2;
 
@@ -388,7 +394,6 @@ public class LoggingSingleton {
 
 	        TarArchiveEntry entry;
 	        while ((entry = tIn.getNextTarEntry()) != null) {
-
 	            Path outPath = targetPath.resolve(entry.getName()).normalize();
 	            if (!outPath.startsWith(targetPath)) {
 	                throw new IOException("Illegal TAR entry: " + entry.getName());
@@ -421,9 +426,9 @@ public class LoggingSingleton {
 				.resolve(finalTarFilename);
 		Path tempDirectoryPath = LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory);
 
-		Set<String> tempFiles = new HashSet<>();
-		tempFiles.add(errorLogFilename);
-		tempFiles.add(testRunInfoFilename); // Move to first in list increase readability
+		Map<String,Path> tempFiles = new TreeMap<>(new FilenameComparator());
+		tempFiles.put(errorLogFilename,null);
+		tempFiles.put(testRunInfoFilename,null); // Move to first in list increase readability
 
 		try (OutputStream fOut = Files.newOutputStream(tempTargetTar);
 		     BufferedOutputStream bOut = new BufferedOutputStream(fOut);
@@ -431,19 +436,27 @@ public class LoggingSingleton {
 		    
 			tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
 		    
+			// Add all diff tar files
     		Files.walkFileTree(tempDirectoryPath, new SimpleFileVisitor<Path>() {
     		    @Override
     		    public FileVisitResult visitFile(Path p, BasicFileAttributes attrs) throws IOException {
     		    	String fileName = p.getFileName().toString();
-    		    	if (tempFiles.contains(fileName) || isDiffsTarZipFilename(fileName)) {
-	   	                 TarArchiveEntry entry = new TarArchiveEntry(p.toFile(), fileName);
-	   	                 tOut.putArchiveEntry(entry);
-	   	                 Files.copy(p, tOut);
-	   	                 tOut.closeArchiveEntry();
+    		    	if (tempFiles.containsKey(fileName) || isDiffsTarZipFilename(fileName)) {
+    		    		tempFiles.put(fileName,p);
     		    	}
     		        return FileVisitResult.CONTINUE;
     		    }
     		});
+    		
+    		for (String fileName:tempFiles.keySet()) {
+    			Path p = tempFiles.getOrDefault(fileName,null);
+    			if (p != null) {
+	                TarArchiveEntry entry = new TarArchiveEntry(p.toFile(), fileName);
+	                tOut.putArchiveEntry(entry);
+	                Files.copy(p, tOut);
+	                tOut.closeArchiveEntry();
+    			}
+    		}
 			
 		    
 		    Files.move(tempTargetTar,targetTar,
@@ -452,6 +465,7 @@ public class LoggingSingleton {
 	    	throw new UncheckedIOException(e);
 	    }
 	}
+
 	
     //================================================================================
     // Error Logging
@@ -505,6 +519,7 @@ public class LoggingSingleton {
     		Path filesDir = LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory);
     		Path tarPath = LoggingSingleton.filepathResolve().resolve(finalTarFilename);
     		
+
 			Files.walk(LoggingSingleton.tempDirectory.resolve("src"))
 		     .sorted(Comparator.reverseOrder())
 		     .map(Path::toFile)
@@ -522,6 +537,7 @@ public class LoggingSingleton {
     			    StandardOpenOption.CREATE,
     			    StandardOpenOption.APPEND
     			);
+    		
     		atomicallySaveTempFiles();
     	} catch (Throwable T) {
     		// Do nothing
