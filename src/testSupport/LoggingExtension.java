@@ -301,7 +301,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 		private boolean tarTooBig() throws IOException {
 		    Path tarPath  = LoggingSingleton.filepathResolve().resolve(LoggingSingleton.finalTarFilename);
-		    long size = 10L * MB_SIZE;
+		    long size = 2L * MB_SIZE;
 		    return fileLargerThan(tarPath, size);
 		}
 		
@@ -678,7 +678,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	    }
 	    }
     	
-    	private static void saveTestRunInfo(ObjectMapper objectMapper, JsonNode testRunInfo) throws StreamWriteException, DatabindException, IOException {
+    	private void saveTestRunInfo(ObjectMapper objectMapper, JsonNode testRunInfo) throws StreamWriteException, DatabindException, IOException {
     		File testRunInfoFile = LoggingSingleton
     				.tempFilepathResolve(LoggingSingleton.tempDirectory)
     				.resolve(LoggingSingleton.testRunInfoFilename).toFile();
