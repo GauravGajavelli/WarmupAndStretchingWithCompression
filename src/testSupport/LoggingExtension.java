@@ -69,14 +69,18 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	try {
     		LoggingSingleton.restartTiming();
     		
+    		boolean skipLogging = false;
     		if ((getRepoFilesSize() > (10L * MB_SIZE)) || tarTooBig()) {
-    			LoggingSingleton.setSkipLogging(true);
+    			skipLogging = true;
     			return;
     		}
 
 	    	if (!loggerInitialized) {
 	    		
 	    		initLogger(); // gets invalid
+	    		if (skipLogging) {
+	    			LoggingSingleton.setSkipLogging(true);
+	    		}
 		        Runtime.getRuntime().addShutdownHook(new Thread(this::close));
 
 				// Initialize the static fields in the singleton
@@ -370,7 +374,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	}
     	
     	private boolean fileIsOrWasLargerThan(Path path, long size) throws IOException {
-    		boolean larger = fileLargerThan(path, MB_SIZE) || LoggingSingleton.fileWasTooLarge(path);
+    		boolean larger = fileLargerThan(path, size) || LoggingSingleton.fileWasTooLarge(path);
     		if (larger) {
     			LoggingSingleton.addTooLargeFile(path);
     		}
