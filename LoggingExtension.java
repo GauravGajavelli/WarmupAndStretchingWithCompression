@@ -582,7 +582,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     			    	if (fileName.endsWith(".java")) {
     			            Path srcRoot   = Paths.get("src");
     			            Path relative  = srcRoot.relativize(file);
-    			            Path packagePath = relative.getParent();
+    			            Path packagePath = (relative.getParent() == null)?relative:relative.getParent(); // default package
     			            String packageName = packagePath
     			                        .toString()
     			                        .replace(File.separatorChar, '.');
