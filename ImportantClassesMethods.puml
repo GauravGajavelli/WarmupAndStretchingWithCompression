@@ -12,23 +12,45 @@ enum TestStatus {
 }
 
 class LoggingExtension {
-  - logger : LoggingSingleton
-  - loggerInitialized : boolean
-  - MB_SIZE : long
-  - KB_SIZE : long
-  - OPEN_MAX_TIME : long
-  - CLOSE_MAX_TIME : long
-  - WAY_TOO_LONG_FACTOR : long
+- logger : LoggingSingleton
+- loggerInitialized : boolean {static}
+- tempDirectory : Path {static}
 
-  + beforeAll(ExtensionContext ctx) : void
-  + beforeEach(ExtensionContext arg0) : void
-  + testAborted(ExtensionContext ctx, Throwable cause) : void
-  + testDisabled(ExtensionContext ctx) : void
-  + testFailed(ExtensionContext ctx, Throwable cause) : void
-  + testSuccessful(ExtensionContext ctx) : void
+~ testRunInfoFilename : String {static}
+~ startTestRunInfoFilename : String {static}
+~ errorLogFilename : String {static}
+~ finalTarFilename : String {static}
+~ diffsPrefix : String {static}
+~ tarSuffix : String {static}
+~ tarZipSuffix : String {static}
+
+~ sourceFolderName : String {static}
+~ testSupportPackageName : String {static}
+~ diffsFolderName : String {static}
+~ patchesFolderName : String {static}
+~ tempFolderName : String {static}
+
+- MB_SIZE : long
+- KB_SIZE : long
+- SYNC_MAX_TIME : long
+- ASYNC_MAX_TIME : long
+- WAY_TOO_LONG_FACTOR : long
+- REBASELINE_SIZE : long
+- MAX_TAR_SIZE : long
+- MAX_REPO_SIZE : long
+- MAX_DIFFED_FILE_SIZE : long
+
+  + beforeAll(ctx: ExtensionContext) : void
+  + beforeEach(ctx: ExtensionContext) : void
+  + testAborted(ctx: ExtensionContext, cause : Throwable) : void
+  + testDisabled(ctx: ExtensionContext) : void
+  + testFailed(ctx: ExtensionContext, cause : Throwable) : void
+  + testSuccessful(ctx: ExtensionContext) : void
   + close() : void
 
-  - initLogger() : void
+  - initDirectories() : void
+  - initTempDirectory() : void
+  - untarLogs(targetPath : Path, tarPath : Path) : void
 
   - tarTooBig() : boolean
   - getRepoFilesSize(): long
@@ -38,14 +60,17 @@ class LoggingExtension {
   - checkTiming(time : long) : void
 
   - unzipAndUntarDiffs() : void
-  - writeDiffs(testRunNumber : int, seed : int, encryptDiffs : boolean) : void
+  - writeDiffs(testRunNumber : int, seed : int, redactDiffs : boolean) : void
   - tarAndZipDiffs() : void
   - saveTestRunInfo(objectMapper : ObjectMapper,testRunInfo : JsonNode) : void
+  - atomicallySaveTempFiles() : void
+
+  - generateMessage(throwable : Throwable) : String
+  - logError(throwable : Throwable) : void
 }
 
 class LoggingSingleton {
-  + {static} tempDirectory : Path
-  - {static} timestamp : String
+  - {static} startTimestamp : String
   - {static} objectMapper : ObjectMapper
   - {static} testRunInfo : JsonNode
   - {static} testFileName : String
@@ -54,32 +79,30 @@ class LoggingSingleton {
   - {static} fileSizes : long
   - {static} startTime : Long
   - {static} accumulatedTime : long
-  ~ {static} testRunInfoFilename : String
-  ~ {static} startTestRunInfoFilename : String
-  ~ {static} errorLogFilename : String
-  ~ {static} finalTarFilename : String
-  ~ {static} diffsPrefix : String
-  ~ {static} tarSuffix : String
-  ~ {static} tarZipSuffix : String
+
+  - {static} prevRunNumber : String // JSON keys for getters/setters
+  - {static} randomSeed : String
+  - {static} redactDiffs : String
+  - {static} rebaselining : String
+  - {static} toIgnore : String
+  - {static} skipLogging : String
+  - {static} strikes : String
+  - {static} prevBaselineRunNumber : String
+  - {static} runTimes : String
+
   - {static} TIME_CHECK_WINDOW_SIZE : int
   - {static} MAX_STRIKES : int
   - {static} instance : LoggingSingleton
 
   - LoggingSingleton()
 
-  + {static} getInstance() : LoggingSingleton
-
-  + {static} untarFile(Path targetPath, Path tarPath) : void
-  + {static} atomicallySaveTempFiles() : void
-
-  - {static} generateMessage(throwable : Throwable) : String
-  + {static} logError(throwable : Throwable) : void
+  ~ {static} getInstance() : LoggingSingleton
 }
 
 ' ===== FilenameComparator =====
 class FilenameComparator {
-  + compare(String a, String b) : int
-  + findFirstNumberRegex(String text) : Integer
+  + compare(a: String, b : String) : int
+  + findFirstNumberRegex(text : String) : Integer
 }
 interface Comparator
 
