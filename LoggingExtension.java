@@ -2,6 +2,8 @@ package testSupport;
 
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.TestWatcher;
+import org.junit.jupiter.api.extension.BeforeAllCallback;
+import org.junit.jupiter.api.extension.BeforeEachCallback;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -27,8 +29,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -37,8 +37,6 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.utils.IOUtils;
-import org.junit.jupiter.api.extension.BeforeAllCallback;
-import org.junit.jupiter.api.extension.BeforeEachCallback;
 
 import com.fasterxml.jackson.core.exc.StreamWriteException;
 import com.fasterxml.jackson.databind.DatabindException;
@@ -59,7 +57,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	static private boolean loggerInitialized = false;
 	static private Path tempDirectory;
 	
-
 	final static String testRunInfoFilename = "testRunInfo.json";
 	final static String startTestRunInfoFilename  = "startTestRunInfo.json";
 	final static String errorLogFilename = "error-logs.txt";
@@ -127,7 +124,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	}
     
 	@Override
-	public void beforeEach(ExtensionContext arg0) {
+	public void beforeEach(ExtensionContext ctx) {
 		try {
 			setUpAndCheckTiming(SYNC_MAX_TIME);
     		
@@ -135,10 +132,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 				return;
 			}
         // Get the test method name
-	        String testName = arg0.getDisplayName();
+	        String testName = ctx.getDisplayName();
 	
 	        // Get the test class
-	        Class<?> testClass = arg0.getTestClass().orElseThrow();
+	        Class<?> testClass = ctx.getTestClass().orElseThrow();
 	
 	        String testFileName = testClass.getSimpleName();
 	

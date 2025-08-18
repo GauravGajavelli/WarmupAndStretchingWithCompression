@@ -12,13 +12,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-public class LoggingSingleton {
+class LoggingSingleton {
 
     //================================================================================
     // Properties
     //================================================================================
 
-	static private String timestamp;
+	static private String startTimestamp;
 	static private ObjectMapper objectMapper;
 	static private JsonNode testRunInfo;
 	static private String testFileName; // Works off of the assumption of one test per logger
@@ -49,7 +49,7 @@ public class LoggingSingleton {
     //================================================================================
 
     private LoggingSingleton(File testRunInfoFile)  {
-    	LoggingSingleton.timestamp = new Timestamp(System.currentTimeMillis()).toString();
+    	LoggingSingleton.startTimestamp = new Timestamp(System.currentTimeMillis()).toString();
     	LoggingSingleton.objectMapper = new ObjectMapper();
     	LoggingSingleton.loggedInitialError = false;
     	try {
@@ -68,50 +68,50 @@ public class LoggingSingleton {
     // Getters
     //================================================================================
 
-    public static LoggingSingleton getInstance(File testRunInfoFile) throws IOException {
+    static LoggingSingleton getInstance(File testRunInfoFile) throws IOException {
         if (instance == null) {
             instance = new LoggingSingleton(testRunInfoFile);
         }
         return instance;
     }
 
-    public static ObjectMapper getObjectMapper() {
+    static ObjectMapper getObjectMapper() {
     	return objectMapper;
     }
 
-    public static JsonNode getTestRunInfo() {
+    static JsonNode getTestRunInfo() {
     	return testRunInfo;
     }
     
-    public static int getCurrentTestRunNumber() {
+    static int getCurrentTestRunNumber() {
 		return getJsonNode(prevRunNumber).asInt();
     }
     
-    public static int getSeed() {
+    static int getSeed() {
 		return getJsonNode(randomSeed).asInt();
     }
 
-    public static boolean getRedactDiffs() {
+    static boolean getRedactDiffs() {
 		return getJsonNode(redactDiffs).asBoolean();
     }
 
-    public static String getTestFileName() {
+    static String getTestFileName() {
         return LoggingSingleton.testFileName;
     }
 
-    public static String getTestFilePackageName() {
+    static String getTestFilePackageName() {
         return LoggingSingleton.testFilePackageName;
     }
     
-    public static boolean isRebaselining() {
+    static boolean isRebaselining() {
 		return getJsonNode(rebaselining).asBoolean();
     }
    
-    public static long getFileSizes() {
+    static long getFileSizes() {
     	return LoggingSingleton.fileSizes;
     }
 
-    public static boolean fileWasTooLarge (Path toCheck) {
+    static boolean fileWasTooLarge (Path toCheck) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
 
         ObjectNode toIgnoreNode = getOrCreateObjectNode(added, toIgnore);
@@ -124,16 +124,16 @@ public class LoggingSingleton {
         return ignoreReason == FileIgnoreReasons.TOO_LARGE;
     }
 
-    public static boolean getSkipLogging() {
+    static boolean getSkipLogging() {
     	return getJsonNode(skipLogging).asBoolean();
     }
 
-    public static long getCurrentTotalElapsedTime() { // in milliseconds
+    static long getCurrentTotalElapsedTime() { // in milliseconds
     	return TimeUnit.NANOSECONDS.toMillis(
     					LoggingSingleton.accumulatedTime+(System.nanoTime()-LoggingSingleton.startTime));
     }
 
-    public static boolean tooManyStrikes() {
+    static boolean tooManyStrikes() {
     	int numStrikes = 0;
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
 
@@ -153,11 +153,11 @@ public class LoggingSingleton {
     	return numStrikes >= MAX_STRIKES;
     }
     
-    public static boolean getLoggedInitialError() {
+    static boolean getLoggedInitialError() {
     	return LoggingSingleton.loggedInitialError;
     }
 
-	public static int getPreviousBaselineRunNumber () {
+	static int getPreviousBaselineRunNumber () {
 		return getJsonNode(prevBaselineRunNumber).asInt();
     }
 
@@ -185,7 +185,7 @@ public class LoggingSingleton {
     // Setters
     //================================================================================
 
-    public static void setTestRunNumberAndStatus(String testFileName, String testName, TestStatus status) {
+    static void setTestRunNumberAndStatus(String testFileName, String testName, TestStatus status) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
         
     	int currentRunNumber = added.get(prevRunNumber).asInt(); // it's already incremented, presumably
@@ -197,7 +197,7 @@ public class LoggingSingleton {
     	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
 
-    public static void setTestRunNumberAndStatus(String testFileName, String testName, TestStatus status, String cause) {
+    static void setTestRunNumberAndStatus(String testFileName, String testName, TestStatus status, String cause) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
 
     	int currentRunNumber = added.get(prevRunNumber).asInt(); // it's already incremented, presumably
@@ -209,22 +209,22 @@ public class LoggingSingleton {
     	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
 
-    public static void setCurrentTestFilePath(String testFileName, String packageName) {
+    static void setCurrentTestFilePath(String testFileName, String packageName) {
         LoggingSingleton.testFileName = testFileName;
         LoggingSingleton.testFilePackageName = packageName;
     }
 
-    public static void resetFileSizes() {
+    static void resetFileSizes() {
     	LoggingSingleton.fileSizes = 0;
     }
     
-    public static void increaseFileSizes(long size) {
+    static void increaseFileSizes(long size) {
     	if (size > 0) {
     		LoggingSingleton.fileSizes += size;
     	}
     }
 
-    public static void addTooLargeFile (Path toAdd) {
+    static void addTooLargeFile (Path toAdd) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
 
         ObjectNode toIgnoreNode = getOrCreateObjectNode(added, toIgnore);
@@ -232,13 +232,13 @@ public class LoggingSingleton {
         LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
     
-    public static void setRebaselining(boolean isRebaselining) {
+    static void setRebaselining(boolean isRebaselining) {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
         incremented.put(rebaselining, isRebaselining);
     	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
     }
     
-    public static void updatePreviousBaselineRunNumber() {
+    static void updatePreviousBaselineRunNumber() {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
     	
         // Update
@@ -246,28 +246,28 @@ public class LoggingSingleton {
     	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
     }
     
-    public static void setSkipLogging(boolean skipLoggingVal) {
+    static void setSkipLogging(boolean skipLoggingVal) {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
         incremented.put(skipLogging, skipLoggingVal);
     	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
     }
 
-    public static void restartTiming() {
+    static void restartTiming() {
     	LoggingSingleton.startTime = System.nanoTime();
     }
 
-    public static void accumulateTime() {
+    static void accumulateTime() {
     	if (LoggingSingleton.startTime == null) {
     		throw new Error("Cannot accumulate time; never started timing");
     	}
     	LoggingSingleton.accumulatedTime += System.nanoTime()-LoggingSingleton.startTime;
     }
 
-    public static void addStrike() {
+    static void addStrike() {
     	updateCurrentStrikeIndex(true);
     }
     
-    public static void addSecondStrike() {
+    static void addSecondStrike() {
     	// next index
     	int currentEntryIndex = (LoggingSingleton.getCurrentTestRunNumber()+1) % TIME_CHECK_WINDOW_SIZE;
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
@@ -278,7 +278,7 @@ public class LoggingSingleton {
     	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
 
-    public static void setLoggedInitialError() {
+    static void setLoggedInitialError() {
     	LoggingSingleton.loggedInitialError = true;
     }
 
@@ -306,7 +306,7 @@ public class LoggingSingleton {
         int currentRunNumber = getCurrentTestRunNumber(); // it's already incremented, presumably
 
         ObjectNode runTimesNode = getOrCreateObjectNode(added, runTimes);
-        runTimesNode.put(Integer.toString(currentRunNumber), LoggingSingleton.timestamp);
+        runTimesNode.put(Integer.toString(currentRunNumber), LoggingSingleton.startTimestamp);
         
     	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
