@@ -3,6 +3,7 @@ import java.util.Comparator;
 import java.util.regex.Pattern;
 
 import java.util.regex.Matcher;
+import testSupport.LoggingExtension;
 
 //Ordering 
 	public class FilenameComparator implements Comparator<String> {
@@ -16,13 +17,13 @@ import java.util.regex.Matcher;
 		
 		private int scoreString(String str) {
 			int comparison = 0;
-			if (LoggingSingleton.isDiffsTarZipFilename(str) && isEvenDiffsTarZipFilename(str)) {
+			if (LoggingExtension.isDiffsTarZipFilename(str) && isEvenDiffsTarZipFilename(str)) {
 				comparison -= 20;
-			} else if (str.equals(LoggingSingleton.testRunInfoFilename)) {
+			} else if (str.equals(LoggingExtension.testRunInfoFilename)) {
 				comparison -= 15;
-			} else if (LoggingSingleton.isDiffsTarZipFilename(str)) {
+			} else if (LoggingExtension.isDiffsTarZipFilename(str)) {
 				comparison -= 10;
-			} else if (str.equals(LoggingSingleton.errorLogFilename)) {
+			} else if (str.equals(LoggingExtension.errorLogFilename)) {
 				comparison -= 5;
 			}
 			return comparison;

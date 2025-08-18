@@ -1,45 +1,15 @@
 package testSupport;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.FileTime;
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.utils.IOUtils;
-
-import java.time.LocalTime;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public class LoggingSingleton {
@@ -47,8 +17,6 @@ public class LoggingSingleton {
     //================================================================================
     // Properties
     //================================================================================
-
-	static public Path tempDirectory;
 
 	static private String timestamp;
 	static private ObjectMapper objectMapper;
@@ -60,13 +28,15 @@ public class LoggingSingleton {
 	static private Long startTime;
 	static private long accumulatedTime = 0;
 
-	static final String testRunInfoFilename = "testRunInfo.json";
-	static final String startTestRunInfoFilename  = "startTestRunInfo.json";
-	static final String errorLogFilename = "error-logs.txt";
-	static final String finalTarFilename = "run.tar";
-	static final String diffsPrefix = "diffs";
-	static final String tarSuffix = ".tar";
-	static final String tarZipSuffix = ".tar.zip";	
+	static private final String prevRunNumber = "prevRunNumber";
+	static private final String randomSeed = "randomSeed";
+	static private final String encryptDiffs = "encryptDiffs";
+	static private final String rebaselining = "rebaselining";
+	static private final String toIgnore = "toIgnore";
+	static private final String skipLogging = "skipLogging";
+	static private final String strikes = "strikes";
+	static private final String prevBaselineRunNumber = "prevBaselineRunNumber";
+	static private final String runTimes = "runTimes";
 
 	static private final int TIME_CHECK_WINDOW_SIZE = 3;
 	static private final int MAX_STRIKES = 2;
@@ -78,59 +48,29 @@ public class LoggingSingleton {
     // Constructor
     //================================================================================
 
-    private LoggingSingleton()  {
+    private LoggingSingleton(File testRunInfoFile)  {
     	LoggingSingleton.timestamp = new Timestamp(System.currentTimeMillis()).toString();
     	LoggingSingleton.objectMapper = new ObjectMapper();
     	LoggingSingleton.loggedInitialError = false;
     	try {
-    		if (LoggingSingleton.tempDirectory == null) {
-    			LoggingSingleton.initTempDirectory();
-    		}
-	        File testRunInfoFile = filepathResolve(tempDirectory).resolve(testRunInfoFilename).toFile();
 			LoggingSingleton.testRunInfo = objectMapper.readTree(testRunInfoFile);
     	} catch (IOException e) {
     		throw new UncheckedIOException(e);
 		} finally {
 	    	createSeedIfNotInitialized();
+	    	incrementRunNumber();
+	    	addRunTime();
+	    	removeOldStrike();
 		}
-    }
-
-    //================================================================================
-    // File Utilities
-    //================================================================================
-
-    public static void initTempDirectory() throws IOException {
-		LoggingSingleton.tempDirectory = Files.createTempDirectory("temp");
-    }
-
-    public static Path tempFilepathResolve(Path toResolve) {
-    	return toResolve
-    			.resolve("src")
-    			.resolve("testSupport")
-    			.resolve("temp");
-    }
-
-    public static Path filepathResolve(Path toResolve) {
-    	return toResolve
-    			.resolve("src")
-    			.resolve("testSupport");
-    }
-
-    public static Path tempFilepathResolve() {
-    	return Paths.get("src","testSupport","temp");
-    }
-
-    public static Path filepathResolve() {
-    	return Paths.get("src","testSupport");
     }
 
     //================================================================================
     // Getters
     //================================================================================
 
-    public static LoggingSingleton getInstance() throws IOException {
+    public static LoggingSingleton getInstance(File testRunInfoFile) throws IOException {
         if (instance == null) {
-            instance = new LoggingSingleton();
+            instance = new LoggingSingleton(testRunInfoFile);
         }
         return instance;
     }
@@ -144,15 +84,15 @@ public class LoggingSingleton {
     }
     
     public static int getCurrentTestRunNumber() {
-		return getJsonNode("prevRunNumber").asInt();
+		return getJsonNode(prevRunNumber).asInt();
     }
     
     public static int getSeed() {
-		return getJsonNode("randomSeed").asInt();
+		return getJsonNode(randomSeed).asInt();
     }
 
     public static boolean getEncryptDiffs() {
-		return getJsonNode("encryptDiffs").asBoolean();
+		return getJsonNode(encryptDiffs).asBoolean();
     }
 
     public static String getTestFileName() {
@@ -164,7 +104,7 @@ public class LoggingSingleton {
     }
     
     public static boolean isRebaselining() {
-		return getJsonNode("rebaselining").asBoolean();
+		return getJsonNode(rebaselining).asBoolean();
     }
    
     public static long getFileSizes() {
@@ -174,7 +114,7 @@ public class LoggingSingleton {
     public static boolean fileWasTooLarge (Path toCheck) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
 
-        ObjectNode toIgnoreNode = getOrCreateObjectNode(added, "toIgnore");
+        ObjectNode toIgnoreNode = getOrCreateObjectNode(added, toIgnore);
         JsonNode node = toIgnoreNode.get(toCheck.toString());
         if (node == null) {
         	return false;
@@ -185,19 +125,7 @@ public class LoggingSingleton {
     }
 
     public static boolean getSkipLogging() {
-    	return getJsonNode("skipLogging").asBoolean();
-    }
-
-    public static String getDiffsTarFilename() {
-    	return diffsPrefix+"_"+LoggingSingleton.getPreviousBaselineRunNumber()+"_"+tarSuffix;
-    }
-    
-    public static String getDiffsTarZipFilename() {
-    	return diffsPrefix+"_"+LoggingSingleton.getPreviousBaselineRunNumber()+"_"+tarZipSuffix;
-    }
-
-    public static boolean isDiffsTarZipFilename(String filename) {
-    	return filename.startsWith(diffsPrefix) && filename.endsWith(tarZipSuffix);
+    	return getJsonNode(skipLogging).asBoolean();
     }
 
     public static long getCurrentTotalElapsedTime() { // in milliseconds
@@ -209,7 +137,7 @@ public class LoggingSingleton {
     	int numStrikes = 0;
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
 
-        ObjectNode strikesNode = getOrCreateObjectNode(added, "strikes");
+        ObjectNode strikesNode = getOrCreateObjectNode(added, strikes);
         
         Iterator<String> iter = strikesNode.fieldNames();
         while (iter.hasNext()) {
@@ -223,6 +151,14 @@ public class LoggingSingleton {
         }
 
     	return numStrikes >= MAX_STRIKES;
+    }
+    
+    public static boolean getLoggedInitialError() {
+    	return LoggingSingleton.loggedInitialError;
+    }
+
+	public static int getPreviousBaselineRunNumber () {
+		return getJsonNode(prevBaselineRunNumber).asInt();
     }
 
     private static JsonNode getJsonNode(String name) {
@@ -245,47 +181,14 @@ public class LoggingSingleton {
         return toRet;
     }
 
-    private static int getPreviousBaselineRunNumber () {
-		return getJsonNode("prevBaselineRunNumber").asInt();
-    }
-
     //================================================================================
     // Setters
     //================================================================================
 
-    public static void incrementRunNumber() {
-    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
-        int prevRunNumber = incremented.get("prevRunNumber").asInt();
-
-        // Increment
-        incremented.put("prevRunNumber", prevRunNumber + 1);
-    	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
-    }
-
-    private static void createSeedIfNotInitialized () {
-    	int randomSeed = (int) System.nanoTime();
-    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
-    	if (!incremented.hasNonNull("randomSeed")) {
-	        // Increment
-	        incremented.put("randomSeed", randomSeed);
-	    	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
-    	}
-    }
-
-    public static void addRunTime() {
-    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
-        int currentRunNumber = getCurrentTestRunNumber(); // it's already incremented, presumably
-
-        ObjectNode runTimesNode = getOrCreateObjectNode(added, "runTimes");
-        runTimesNode.put(Integer.toString(currentRunNumber), LoggingSingleton.timestamp);
-        
-    	LoggingSingleton.testRunInfo = ((JsonNode)(added));
-    }
-
     public static void setTestRunNumberAndStatus(String testFileName, String testName, TestStatus status) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
         
-    	int currentRunNumber = added.get("prevRunNumber").asInt(); // it's already incremented, presumably
+    	int currentRunNumber = added.get(prevRunNumber).asInt(); // it's already incremented, presumably
         
         ObjectNode testFileNameNode = getOrCreateObjectNode(added, testFileName);
         ObjectNode testNameNode = getOrCreateObjectNode(testFileNameNode, testName);
@@ -297,7 +200,7 @@ public class LoggingSingleton {
     public static void setTestRunNumberAndStatus(String testFileName, String testName, TestStatus status, String cause) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
 
-    	int currentRunNumber = added.get("prevRunNumber").asInt(); // it's already incremented, presumably
+    	int currentRunNumber = added.get(prevRunNumber).asInt(); // it's already incremented, presumably
 
         ObjectNode testFileNameNode = getOrCreateObjectNode(added, testFileName);
         ObjectNode testNameNode = getOrCreateObjectNode(testFileNameNode, testName);
@@ -324,14 +227,14 @@ public class LoggingSingleton {
     public static void addTooLargeFile (Path toAdd) {
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
 
-        ObjectNode toIgnoreNode = getOrCreateObjectNode(added, "toIgnore");
+        ObjectNode toIgnoreNode = getOrCreateObjectNode(added, toIgnore);
         toIgnoreNode.put(toAdd.toString(),FileIgnoreReasons.TOO_LARGE.toString());
         LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
     
     public static void setRebaselining(boolean isRebaselining) {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
-        incremented.put("rebaselining", isRebaselining);
+        incremented.put(rebaselining, isRebaselining);
     	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
     }
     
@@ -339,13 +242,13 @@ public class LoggingSingleton {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
     	
         // Update
-        incremented.put("prevBaselineRunNumber", LoggingSingleton.getCurrentTestRunNumber());
+        incremented.put(prevBaselineRunNumber, LoggingSingleton.getCurrentTestRunNumber());
     	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
     }
     
-    public static void setSkipLogging(boolean skipLogging) {
+    public static void setSkipLogging(boolean skipLoggingVal) {
     	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
-        incremented.put("skipLogging", skipLogging);
+        incremented.put(skipLogging, skipLoggingVal);
     	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
     }
 
@@ -369,15 +272,46 @@ public class LoggingSingleton {
     	int currentEntryIndex = (LoggingSingleton.getCurrentTestRunNumber()+1) % TIME_CHECK_WINDOW_SIZE;
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
 
-        ObjectNode strikesNode = getOrCreateObjectNode(added, "strikes");
+        ObjectNode strikesNode = getOrCreateObjectNode(added, strikes);
         strikesNode.put(Integer.toString(currentEntryIndex),true);
 
     	LoggingSingleton.testRunInfo = ((JsonNode)(added));
+    }
 
+    public static void setLoggedInitialError() {
+    	LoggingSingleton.loggedInitialError = true;
+    }
+
+	private static void incrementRunNumber() {
+    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
+        int prevRunNumberVal = incremented.get(prevRunNumber).asInt();
+
+        // Increment
+        incremented.put(prevRunNumber, prevRunNumberVal + 1);
+    	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
+    }
+
+    private static void createSeedIfNotInitialized () {
+    	int randomSeedVal = (int) System.nanoTime();
+    	ObjectNode incremented = (ObjectNode)LoggingSingleton.testRunInfo;
+    	if (!incremented.hasNonNull(randomSeed)) {
+	        // Increment
+	        incremented.put(randomSeed, randomSeedVal);
+	    	LoggingSingleton.testRunInfo = ((JsonNode)(incremented));
+    	}
+    }
+
+    private static void addRunTime() {
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+        int currentRunNumber = getCurrentTestRunNumber(); // it's already incremented, presumably
+
+        ObjectNode runTimesNode = getOrCreateObjectNode(added, runTimes);
+        runTimesNode.put(Integer.toString(currentRunNumber), LoggingSingleton.timestamp);
+        
+    	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
     
-    
-    public static void removeOldStrike() {
+    private static void removeOldStrike() {
     	updateCurrentStrikeIndex(false);
     }
     
@@ -385,178 +319,12 @@ public class LoggingSingleton {
     	int currentEntryIndex = LoggingSingleton.getCurrentTestRunNumber() % TIME_CHECK_WINDOW_SIZE;
     	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
 
-        ObjectNode strikesNode = getOrCreateObjectNode(added, "strikes");
+        ObjectNode strikesNode = getOrCreateObjectNode(added, strikes);
         strikesNode.put(Integer.toString(currentEntryIndex),struck);
 
     	LoggingSingleton.testRunInfo = ((JsonNode)(added));
     }
 
-    //================================================================================
-    // Diff Update/Error Logging Shared Methods
-    //================================================================================
-
-	// note that this is gets rid of the outermost folder surrounding the tar
-	public static void untarFile(Path targetPath, Path tarPath) {
-		if (Files.notExists(tarPath)) {
-			return;
-		}
-	    try (InputStream fIn  = Files.newInputStream(tarPath);
-	         BufferedInputStream bIn = new BufferedInputStream(fIn);
-	         TarArchiveInputStream tIn = new TarArchiveInputStream(bIn)) {
-
-	        TarArchiveEntry entry;
-	        while ((entry = tIn.getNextTarEntry()) != null) {
-	            Path outPath = targetPath.resolve(entry.getName()).normalize();
-	            if (!outPath.startsWith(targetPath)) {
-	                throw new IOException("Illegal TAR entry: " + entry.getName());
-	            }
-	            
-	            Path upDirectory = outPath.getParent();
-	            if (entry.isDirectory()) {
-	                Files.createDirectories(upDirectory);
-	            } else {
-	                Files.createDirectories(upDirectory);
-	                try (OutputStream o = Files.newOutputStream(outPath, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE)) {
-	                    IOUtils.copy(tIn, o);         // stream file bytes
-	                }
-
-	                FileTime mtime = FileTime.fromMillis(entry.getModTime().getTime());
-	                Files.setLastModifiedTime(outPath, mtime);
-	            }
-	        }
-	    } catch (IOException e) { 
-	    	throw new UncheckedIOException(e);
-	    }
-	}
-	
-	public static void atomicallySaveTempFiles() {
-		Path targetTar = LoggingSingleton
-				.filepathResolve()
-				.resolve(finalTarFilename);
-		Path tempTargetTar = LoggingSingleton
-				.tempFilepathResolve(LoggingSingleton.tempDirectory)
-				.resolve(finalTarFilename);
-		Path tempDirectoryPath = LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory);
-
-		Map<String,Path> tempFiles = new TreeMap<>(new FilenameComparator());
-		tempFiles.put(errorLogFilename,null);
-		tempFiles.put(testRunInfoFilename,null); // Move to first in list increase readability
-
-		try (OutputStream fOut = Files.newOutputStream(tempTargetTar);
-		     BufferedOutputStream bOut = new BufferedOutputStream(fOut);
-		     TarArchiveOutputStream tOut = new TarArchiveOutputStream(bOut)) {
-		    
-			tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-		    
-			// Add all diff tar files
-    		Files.walkFileTree(tempDirectoryPath, new SimpleFileVisitor<Path>() {
-    		    @Override
-    		    public FileVisitResult visitFile(Path p, BasicFileAttributes attrs) throws IOException {
-    		    	String fileName = p.getFileName().toString();
-    		    	if (tempFiles.containsKey(fileName) || isDiffsTarZipFilename(fileName)) {
-    		    		tempFiles.put(fileName,p);
-    		    	}
-    		        return FileVisitResult.CONTINUE;
-    		    }
-    		});
-    		
-    		for (String fileName:tempFiles.keySet()) {
-    			Path p = tempFiles.getOrDefault(fileName,null);
-    			if (p != null) {
-	                TarArchiveEntry entry = new TarArchiveEntry(p.toFile(), fileName);
-	                tOut.putArchiveEntry(entry);
-	                Files.copy(p, tOut);
-	                tOut.closeArchiveEntry();
-    			}
-    		}
-			
-		    
-		    Files.move(tempTargetTar,targetTar,
-		            StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-	    } catch (IOException e) { 
-	    	throw new UncheckedIOException(e);
-	    }
-	}
-
-	
-    //================================================================================
-    // Error Logging
-    //================================================================================
-	
-	private static String generateMessage(Throwable throwable) {
-		StringBuilder stackStringBuilder = new StringBuilder();
-
-		int messageLength = 0;
-		int messageLengthLimit = 256;
-		for (StackTraceElement ste:throwable.getStackTrace()) {
-			String steMessage = ste.toString();
-
-			if ((steMessage != null && steMessage.length() > 0)
-					&& messageLength < messageLengthLimit) {
-				stackStringBuilder.append(steMessage);
-				stackStringBuilder.append("\n");
-				
-				messageLength += steMessage.length()+1;
-			}
-		}
-		return "Message "
-				+ LoggingSingleton.getCurrentTestRunNumber()
-				+" - "
-				+ LocalTime.now()
-				+ ": "
-				+getTestFilePackageName()
-				+" "
-				+getTestFileName()
-				+ "\n"
-				+ throwable.getMessage()
-				+ "\n"
-				+ stackStringBuilder.toString()
-				+ "\n";
-	}
-
-	// Essentially makes a last-ditch effort to log things properly
-    public static void logError(Throwable throwable) {
-    	try {
-	        LoggingSingleton.accumulateTime(); // all publics throwing this will have already started time
-    		
-    		String message = generateMessage(throwable);
-//    		 System.out.println("\n ERROR: "+message);
-    		if (loggedInitialError) {
-    			return;
-    		}
-    		loggedInitialError = true;
-    		setSkipLogging(true);
-    		
-    		Path errorFilepath = tempFilepathResolve(tempDirectory).resolve(errorLogFilename);
-    		Path filesDir = LoggingSingleton.tempFilepathResolve(LoggingSingleton.tempDirectory);
-    		Path tarPath = LoggingSingleton.filepathResolve().resolve(finalTarFilename);
-    		
-
-			Files.walk(LoggingSingleton.tempDirectory.resolve("src"))
-		     .sorted(Comparator.reverseOrder())
-		     .map(Path::toFile)
-		     .forEach(File::delete);
-			
-    		Files.createDirectories(errorFilepath.getParent());
-    		Files.createDirectories(filesDir);
-    		Files.createDirectories(tarPath.getParent());
-    		
-   	    	untarFile(filesDir, tarPath);
-//   	    	System.out.print(tempDirectory);
-    		Files.write(
-    				errorFilepath,
-    			    List.of(message),
-    			    StandardOpenOption.CREATE,
-    			    StandardOpenOption.APPEND
-    			);
-    		
-    		atomicallySaveTempFiles();
-    	} catch (Throwable T) {
-    		// Do nothing
-//    		String message = generateMessage(T);
-//    		System.out.println("\n DOUBLE ERROR: "+message);
-    	}
-    }
 }
 
 
