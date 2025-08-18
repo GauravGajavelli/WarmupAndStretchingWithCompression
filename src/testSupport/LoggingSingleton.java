@@ -364,6 +364,18 @@ public class LoggingSingleton {
     	updateCurrentStrikeIndex(true);
     }
     
+    public static void addSecondStrike() {
+    	// next index
+    	int currentEntryIndex = (LoggingSingleton.getCurrentTestRunNumber()+1) % TIME_CHECK_WINDOW_SIZE;
+    	ObjectNode added = (ObjectNode)LoggingSingleton.testRunInfo;
+
+        ObjectNode strikesNode = getOrCreateObjectNode(added, "strikes");
+        strikesNode.put(Integer.toString(currentEntryIndex),true);
+
+    	LoggingSingleton.testRunInfo = ((JsonNode)(added));
+
+    }
+    
     
     public static void removeOldStrike() {
     	updateCurrentStrikeIndex(false);

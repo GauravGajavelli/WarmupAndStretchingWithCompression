@@ -109,7 +109,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 		try {
 			setUpAndCheckTiming(OPEN_MAX_TIME);
     		
-			if (LoggingSingleton.getSkipLogging()) {
+			if (LoggingSingleton.getSkipLogging() || LoggingSingleton.tooManyStrikes()) {
 				return;
 			}
         // Get the test method name
@@ -134,7 +134,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 		try {
 			setUpAndCheckTiming(OPEN_MAX_TIME);
 	        
-			if (LoggingSingleton.getSkipLogging()) {
+			if (LoggingSingleton.getSkipLogging() || LoggingSingleton.tooManyStrikes()) {
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.ABORTED, cause);
@@ -150,7 +150,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 		try {
 			setUpAndCheckTiming(OPEN_MAX_TIME);
 
-			if (LoggingSingleton.getSkipLogging()) {
+			if (LoggingSingleton.getSkipLogging() || LoggingSingleton.tooManyStrikes()) {
 				return;
 			}
 		    setTestRunNumberAndStatusHelper(ctx, TestStatus.DISABLED);
@@ -167,7 +167,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 		try {
 			setUpAndCheckTiming(OPEN_MAX_TIME);
 
-			if (LoggingSingleton.getSkipLogging()) {
+			if (LoggingSingleton.getSkipLogging() || LoggingSingleton.tooManyStrikes()) {
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.FAILED, cause);
@@ -184,7 +184,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 		try {
 			setUpAndCheckTiming(OPEN_MAX_TIME);
 
-			if (LoggingSingleton.getSkipLogging()) {
+			if (LoggingSingleton.getSkipLogging() || LoggingSingleton.tooManyStrikes()) {
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.SUCCESSFUL);
@@ -202,6 +202,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 //			Thread.sleep(10000);
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
+			} else if (LoggingSingleton.tooManyStrikes()) {
+				LoggingSingleton.setSkipLogging(true);
 			}
 
 			int currentTestRunNumber = logger.getCurrentTestRunNumber();
@@ -341,7 +343,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
     		boolean tooManyStrikes = LoggingSingleton.tooManyStrikes();
     		if (tooManyStrikes || (timeElapsed > WAY_TOO_LONG_FACTOR*time)) {
-    			LoggingSingleton.setSkipLogging(true);
+    			LoggingSingleton.addSecondStrike();
     		}
         }
 		
