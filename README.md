@@ -16,5 +16,5 @@
     - patches/
       - Contains all diffs from current (hashed) file against baseline
       - Name formatting: package.className_testRunNumber
-    - error-logs.txt
-      - Just appends the first few hundred characters of the stack trace
+  - error-logs.txt
+    - Just appends the first few hundred characters of the stack trace
