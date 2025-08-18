@@ -20,6 +20,7 @@ import testSupport.LoggingExtension;
 public class AnagramTests {
 	private static float points = 0;
 	
+	// tohoho
 	
 	/**
 	 * Tests {@link Anagram#isAnagram(String, String)}.
