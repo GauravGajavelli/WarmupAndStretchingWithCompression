@@ -2,7 +2,7 @@
   "schema_version" : 1.0,
   "prevRunNumber" : 0,
   "runTimes": {},
-  "encryptDiffs":true,
+  "redactDiffs":true,
   "rebaselining":false,
   "prevBaselineRunNumber":0,
   "skipLogging":false,

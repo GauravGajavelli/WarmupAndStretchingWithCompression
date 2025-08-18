@@ -30,7 +30,7 @@ public class LoggingSingleton {
 
 	static private final String prevRunNumber = "prevRunNumber";
 	static private final String randomSeed = "randomSeed";
-	static private final String encryptDiffs = "encryptDiffs";
+	static private final String redactDiffs = "redactDiffs";
 	static private final String rebaselining = "rebaselining";
 	static private final String toIgnore = "toIgnore";
 	static private final String skipLogging = "skipLogging";
@@ -91,8 +91,8 @@ public class LoggingSingleton {
 		return getJsonNode(randomSeed).asInt();
     }
 
-    public static boolean getEncryptDiffs() {
-		return getJsonNode(encryptDiffs).asBoolean();
+    public static boolean getRedactDiffs() {
+		return getJsonNode(redactDiffs).asBoolean();
     }
 
     public static String getTestFileName() {

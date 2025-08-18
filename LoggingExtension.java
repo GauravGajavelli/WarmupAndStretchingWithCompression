@@ -138,8 +138,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	        String testName = arg0.getDisplayName();
 	
 	        // Get the test class
-	        Class<?> testClass = arg0.getTestClass()
-	            .orElseThrow(() -> new IllegalStateException("No test class"));
+	        Class<?> testClass = arg0.getTestClass().orElseThrow();
 	
 	        String testFileName = testClass.getSimpleName();
 	
@@ -230,10 +229,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 			int currentTestRunNumber = logger.getCurrentTestRunNumber();
 			int seed = logger.getSeed();
-			boolean encryptDiffs = logger.getEncryptDiffs();
+			boolean redactDiffs = logger.getRedactDiffs();
 			
 			unzipAndUntarDiffs();
-			writeDiffs(currentTestRunNumber, seed, encryptDiffs);
+			writeDiffs(currentTestRunNumber, seed, redactDiffs);
 			tarAndZipDiffs();
 			
 			// Copies over unchanged prior baselined diffs
@@ -534,7 +533,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	    return (char) ('a' + idx);
     	}
     	
-    	private char getEncryptedChar(char c, int seed) {
+    	private char getRedactedChar(char c, int seed) {
             int x = seed ^ c;          // combine seed and character
             x *= 0x27D4_EB2D;           // mix 1
             x ^= x >>> 15;              // mix 2
@@ -550,7 +549,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
             return idxToAlphanum(idx);
     	}
 
-    	private String encryptString(String str, int seed) {
+    	private String redactString(String str, int seed) {
     		boolean sequenceStarted = false;
     		char seqChar = '$';
     		StringBuilder toRet = new StringBuilder();
@@ -558,7 +557,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     			char c = str.charAt(i);
     			if (isAlphanum(c)) {
     				if (!sequenceStarted) {
-    					seqChar = getEncryptedChar(c,seed);
+    					seqChar = getRedactedChar(c,seed);
     					sequenceStarted = true;
     				}
         			toRet.append(seqChar);
@@ -571,10 +570,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     		return toRet.toString();
     	}
     	
-    	private List<String> encryptStrings(List<String> strs, int seed) {
+    	private List<String> redactStrings(List<String> strs, int seed) {
     		List<String> toRet = new ArrayList<>();
     		for (String str:strs) {
-    			toRet.add(encryptString(str,seed));
+    			toRet.add(redactString(str,seed));
     		}
     		return toRet;
     	}
@@ -634,7 +633,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	    }
     	}
 
-    	private void writeDiffs(int testRunNumber, int seed, boolean encryptDiffs) throws IOException {
+    	private void writeDiffs(int testRunNumber, int seed, boolean redactDiffs) throws IOException {
     		
 			Path sourceFolder = Paths.get(sourceFolderName);
 			Path tempDiffsFolder = filepathResolve(tempDirectory)
@@ -662,7 +661,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 			            if (Files.exists(baselineFilePath)) { // the file already exists, diff it
 			            	try {
-			            		addDiffedFile(fileNameNoJava, packageName, file, baselineFilePath, testRunNumber, seed, encryptDiffs);
+			            		addDiffedFile(fileNameNoJava, packageName, file, baselineFilePath, testRunNumber, seed, redactDiffs);
     			    	    } catch (DiffException e) { 
     			    	    	throw new UncheckedIOException("DiffException: "+e.getMessage(), null);
     			    	    } catch (IOException e) { 
@@ -674,8 +673,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 			                		
     			                	String sourceContents = new String(Files.readAllBytes(file));
     			                	
-    			                	if (encryptDiffs) {
-    			                		sourceContents = encryptString(sourceContents, seed); // one-way encryption
+    			                	if (redactDiffs) {
+    			                		sourceContents = redactString(sourceContents, seed); // one-way redaction
     			                	}
     			                	Files.createDirectories(baselineFilePath.getParent());
     			                	
@@ -833,7 +832,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
         //================================================================================
     	
     	private long addDiffedFile(String fileName, String packageName, Path revisedPath, Path sourcePath, 
-    			int testRunNumber, int seed, boolean encryptDiffs) throws DiffException, IOException {
+    			int testRunNumber, int seed, boolean redactDiffs) throws DiffException, IOException {
     		// Create this path if it didn't exist: testSupport/diffs/patches/filename
     		String toWriteName = fileName + "_" + testRunNumber;
     		Path toWritePath = filepathResolve(tempDirectory)
@@ -848,8 +847,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	        List<String> original = readContents(sourcePath);
     	        List<String> revised = 	Files.readAllLines(revisedPath);
     	        
-    	        if (encryptDiffs) {
-    	        	revised = encryptStrings(revised,seed); // original should already be encrypted
+    	        if (redactDiffs) {
+    	        	revised = redactStrings(revised,seed); // original should already be redacted
     	        }
 
     	        // Compute the diff: original -> revised
@@ -937,13 +936,12 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     				+ "\n";
     	}
 
-    	// Essentially makes a last-ditch effort to log things properly
+    	// Essentially makes a last-ditch effort to log the error
         private void logError(Throwable throwable) {
         	try {
     	        LoggingSingleton.accumulateTime(); // all publics throwing this will have already started time
         		
         		String message = generateMessage(throwable);
-//        		 System.out.println("\n ERROR: "+message);
         		if (LoggingSingleton.getLoggedInitialError()) {
         			return;
         		}
@@ -975,8 +973,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
         		atomicallySaveTempFiles();
         	} catch (Throwable T) {
         		// Do nothing
-//        		String message = generateMessage(T);
-//        		System.out.println("\n DOUBLE ERROR: "+message);
         	}
         }
 }
