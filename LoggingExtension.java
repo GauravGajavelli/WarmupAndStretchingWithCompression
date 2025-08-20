@@ -479,7 +479,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	}
     	
     	//================================================================================
-        // String/Hashing Methods
+        // String/Redacting Methods
         //================================================================================
     	
     	private String buildDiffOutputString(List<AbstractDelta<String>> deltas) {
@@ -896,7 +896,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	    	throw new UncheckedIOException(e);
     	    }
     	}
-
     	
         //================================================================================
         // Error Logging
