@@ -6,7 +6,7 @@ import java.util.regex.Matcher;
 import testSupport.LoggingExtension;
 
 //Ordering 
-	public class FilenameComparator implements Comparator<String> {
+	class FilenameComparator implements Comparator<String> {
 		  @Override
 		  public int compare(String a, String b) {
 		    int sa = scoreString(a), sb = scoreString(b);
@@ -33,7 +33,7 @@ import testSupport.LoggingExtension;
 			return findFirstNumberRegex(str)%2 == 0;
 		}
 		
-	    public static Integer findFirstNumberRegex(String text) {
+	    private static Integer findFirstNumberRegex(String text) {
 	        Pattern pattern = Pattern.compile("\\d+"); // Matches one or more digits
 	        Matcher matcher = pattern.matcher(text);
 
