@@ -11,10 +11,10 @@
   - diffs.tar.zip
     - Two subdirectories
     - baselines/
-      - Contains all (hashed) files outside of the testSupport package
+      - Contains all (redacted) files outside of the testSupport package
       - Name formatting: package.className
     - patches/
-      - Contains all diffs from current (hashed) file against baseline
+      - Contains all diffs from current (redacted) file against baseline
       - Name formatting: package.className_testRunNumber
   - error-logs.txt
     - Just appends the first few hundred characters of the stack trace
