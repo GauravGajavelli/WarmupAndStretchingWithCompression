@@ -90,9 +90,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
     	try {
     		LoggingSingleton.restartTiming();
     		
-    		boolean skipLogging = false;
     		if ((getRepoFilesSize() > MAX_REPO_SIZE) || tarTooBig()) {
-    			skipLogging = true;
     			return;
     		}
 
@@ -103,9 +101,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	    				.resolve(testRunInfoFilename).toFile();
 				logger = LoggingSingleton.getInstance(testRunInfoFile);
 
-				if (skipLogging) {
-	    			LoggingSingleton.setSkipLogging(true);
-	    		}
 		        Runtime.getRuntime().addShutdownHook(new Thread(this::close));
 	
 		    	loggerInitialized = true;
