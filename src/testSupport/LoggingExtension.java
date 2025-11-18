@@ -478,14 +478,20 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
         //================================================================================
     	
     	private String buildDiffOutputString(List<AbstractDelta<String>> deltas) {
-    		StringBuilder toRet = new StringBuilder();
-    		 // similar to encode/decode string; number of diffs and a delimiter
-    		toRet.append(deltas.size());
-    		toRet.append(";\n");
-    		for (int i = 0; i < deltas.size(); i++) {
-    			AbstractDelta<String> delta = deltas.get(i);
-                toRet.append(delta.getType());
-        		toRet.append("\n");
+    	    StringBuilder toRet = new StringBuilder();
+    	    toRet.append(deltas.size());
+    	    toRet.append(";\n");
+
+    	    for (AbstractDelta<String> delta : deltas) {
+    	        toRet.append(delta.getType());
+    	        toRet.append("\n");
+
+    	        int srcPos = delta.getSource().getPosition();
+    	        int tgtPos = delta.getTarget().getPosition();
+    	        toRet.append(srcPos);
+    	        toRet.append(",");
+    	        toRet.append(tgtPos);
+    	        toRet.append("\n");
 
                 List<String> sourceLines = delta.getSource().getLines();
         		toRet.append(sourceLines.size());
@@ -502,9 +508,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
         			toRet.append(targetLine);
             		toRet.append("\n");
         		}
-    		}
-    		return toRet.toString();
+    	    }
+    	    return toRet.toString();
     	}
+
     	
     	private boolean isAlphanum(char c) {
     		return ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
