@@ -105,7 +105,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 			if (tempDirectory == null) {
 				initTempDirectory();
 			}
-//int a = 1/0;
+			
 			long repoSize = getRepoFilesSize();
 			boolean repoTooBig = repoSize > MAX_REPO_SIZE;
 			boolean tarIsTooBig = tarTooBig();
