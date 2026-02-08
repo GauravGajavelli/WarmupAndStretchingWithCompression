@@ -66,6 +66,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	static private Map<Path, List<String>> inMemoryBaselines;  // Source files captured at test start time
 	static private Map<Path, String> inMemoryBaselineBytes;  // new String(Files.readAllBytes(file))
 	static private boolean currentTestIsSpeedTest = false;  // Skip timing for @SpeedTest methods
+	static private boolean loggedShutdownReason = false;  // Ensures shutdown reason is logged only once
 
 	final static String testRunInfoFilename = "testRunInfo.json";
 	final static String startTestRunInfoFilename  = "startTestRunInfo.json";
@@ -99,8 +100,21 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	public void beforeAll(ExtensionContext ctx) {
 		try {
 			LoggingSingleton.restartTiming();
-int a = 1/0;
-			if ((getRepoFilesSize() > MAX_REPO_SIZE) || tarTooBig()) {
+
+			// Initialize tempDirectory early so logError() can work if exceptions occur
+			if (tempDirectory == null) {
+				initTempDirectory();
+			}
+//int a = 1/0;
+			long repoSize = getRepoFilesSize();
+			boolean repoTooBig = repoSize > MAX_REPO_SIZE;
+			boolean tarIsTooBig = tarTooBig();
+			if (repoTooBig || tarIsTooBig) {
+				if (repoTooBig) {
+					logShutdownReason("Repo size (" + repoSize + " bytes) exceeds MAX_REPO_SIZE (" + MAX_REPO_SIZE + " bytes)");
+				} else {
+					logShutdownReason("Tar size exceeds MAX_TAR_SIZE (" + MAX_TAR_SIZE + " bytes)");
+				}
 				return;
 			}
 
@@ -145,7 +159,14 @@ int a = 1/0;
 
 			setUpAndCheckTiming(SYNC_MAX_TIME);
 
-			if (LoggingSingleton.getSkipLogging() || LoggingSingleton.tooManyStrikes()) {
+			boolean skip = LoggingSingleton.getSkipLogging();
+			boolean strikes = LoggingSingleton.tooManyStrikes();
+			if (skip || strikes) {
+				if (skip) {
+					logShutdownReason("skipLogging flag is set");
+				} else {
+					logShutdownReason("Too many timing strikes accumulated");
+				}
 				return;
 			}
 			// Get the test method name
@@ -169,7 +190,14 @@ int a = 1/0;
 		try {
 			setUpAndCheckTiming(SYNC_MAX_TIME);
 
-			if (LoggingSingleton.getSkipLogging() || LoggingSingleton.tooManyStrikes()) {
+			boolean skip = LoggingSingleton.getSkipLogging();
+			boolean strikes = LoggingSingleton.tooManyStrikes();
+			if (skip || strikes) {
+				if (skip) {
+					logShutdownReason("skipLogging flag is set");
+				} else {
+					logShutdownReason("Too many timing strikes accumulated");
+				}
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.ABORTED, cause);
@@ -185,7 +213,14 @@ int a = 1/0;
 		try {
 			setUpAndCheckTiming(SYNC_MAX_TIME);
 
-			if (LoggingSingleton.getSkipLogging() || LoggingSingleton.tooManyStrikes()) {
+			boolean skip = LoggingSingleton.getSkipLogging();
+			boolean strikes = LoggingSingleton.tooManyStrikes();
+			if (skip || strikes) {
+				if (skip) {
+					logShutdownReason("skipLogging flag is set");
+				} else {
+					logShutdownReason("Too many timing strikes accumulated");
+				}
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.DISABLED);
@@ -202,7 +237,14 @@ int a = 1/0;
 		try {
 			setUpAndCheckTiming(SYNC_MAX_TIME);
 
-			if (LoggingSingleton.getSkipLogging() || LoggingSingleton.tooManyStrikes()) {
+			boolean skip = LoggingSingleton.getSkipLogging();
+			boolean strikes = LoggingSingleton.tooManyStrikes();
+			if (skip || strikes) {
+				if (skip) {
+					logShutdownReason("skipLogging flag is set");
+				} else {
+					logShutdownReason("Too many timing strikes accumulated");
+				}
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.FAILED, cause);
@@ -219,7 +261,14 @@ int a = 1/0;
 		try {
 			setUpAndCheckTiming(SYNC_MAX_TIME);
 
-			if (LoggingSingleton.getSkipLogging() || LoggingSingleton.tooManyStrikes()) {
+			boolean skip = LoggingSingleton.getSkipLogging();
+			boolean strikes = LoggingSingleton.tooManyStrikes();
+			if (skip || strikes) {
+				if (skip) {
+					logShutdownReason("skipLogging flag is set");
+				} else {
+					logShutdownReason("Too many timing strikes accumulated");
+				}
 				return;
 			}
 			setTestRunNumberAndStatusHelper(ctx, TestStatus.SUCCESSFUL);
@@ -238,8 +287,10 @@ int a = 1/0;
 		try {
 			setUpAndCheckTiming(ASYNC_MAX_TIME);
 			if (LoggingSingleton.getSkipLogging()) {
+				logShutdownReason("skipLogging flag is set (in close)");
 				return;
 			} else if (LoggingSingleton.tooManyStrikes()) {
+				logShutdownReason("Too many timing strikes accumulated (in close)");
 				LoggingSingleton.setSkipLogging(true);
 			}
 
@@ -278,6 +329,14 @@ int a = 1/0;
 				Files.write(errorFilepath, errors, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
 			}
 
+			// Log successful run number if no errors and no shutdown occurred
+			// This allows identifying gaps where runs failed
+			if (errors.isEmpty() && !loggedShutdownReason) {
+				Path errorFilepath = tempFilepathResolve(tempDirectory).resolve(errorLogFilename);
+				Files.write(errorFilepath, List.of(String.valueOf(currentTestRunNumber)),
+						StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+			}
+
 			errors.addAll(safeExecute("atomicallySaveTempFiles", () -> atomicallySaveTempFiles()));
 
 			// Delete intermediates - failure here is non-critical
@@ -298,9 +357,7 @@ int a = 1/0;
 				saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo());
 				atomicallySaveTempFiles();
 			} catch (Throwable ignored) {
-				// Absolute last resort - print to stderr so it's not completely silent
-				System.err.println("LOGGER FATAL ERROR: " + T.getMessage());
-				T.printStackTrace();
+				// Fail silently - no stderr output
 			}
 		}
 	}
@@ -317,8 +374,6 @@ int a = 1/0;
 		} catch (Throwable t) {
 			String error = "ERROR in " + operationName + ": " + t.getClass().getName() + ": " + t.getMessage();
 			errors.add(error);
-			// Also print to stderr for visibility during development
-			System.err.println("[LoggingExtension] " + error);
 		}
 		return errors;
 	}
@@ -1008,14 +1063,31 @@ int a = 1/0;
 				messageLength += steMessage.length()+1;
 			}
 		}
+
+		// Safely get values that may not be initialized yet
+		String runNum = "?";
+		String pkgName = "?";
+		String fileName = "?";
+		try {
+			runNum = String.valueOf(LoggingSingleton.getCurrentTestRunNumber());
+		} catch (Throwable ignored) {}
+		try {
+			String pkg = LoggingSingleton.getTestFilePackageName();
+			if (pkg != null) pkgName = pkg;
+		} catch (Throwable ignored) {}
+		try {
+			String file = LoggingSingleton.getTestFileName();
+			if (file != null) fileName = file;
+		} catch (Throwable ignored) {}
+
 		return "Message "
-				+ LoggingSingleton.getCurrentTestRunNumber()
+				+ runNum
 				+" - "
 				+ LocalTime.now()
 				+ ": "
-				+ LoggingSingleton.getTestFilePackageName()
+				+ pkgName
 				+" "
-				+ LoggingSingleton.getTestFileName()
+				+ fileName
 				+ "\n"
 				+ throwable.getMessage()
 				+ "\n"
@@ -1024,22 +1096,25 @@ int a = 1/0;
 	}
 
 	// Essentially makes a last-ditch effort to log the error
-	// Now with defensive error handling - never silently fails
+	// Now with defensive error handling - fails silently (no stderr)
 	private void logError(Throwable throwable) {
-		// Always print to stderr so errors are visible
-		System.err.println("[LoggingExtension] Error caught: " + throwable.getClass().getName() + ": " + throwable.getMessage());
-		throwable.printStackTrace(System.err);
-
 		try {
-			LoggingSingleton.accumulateTime();
+			try {
+				LoggingSingleton.accumulateTime();
+			} catch (Throwable ignored) {
+				// May not have started timing yet
+			}
 
 			String message = generateMessage(throwable);
 			if (LoggingSingleton.getLoggedInitialError()) {
 				return;
 			}
 			LoggingSingleton.setLoggedInitialError();
-			// Don't set skipLogging=true anymore - let the logger continue trying
-			// LoggingSingleton.setSkipLogging(true);
+
+			// Ensure tempDirectory exists before trying to use it
+			if (tempDirectory == null) {
+				initTempDirectory();
+			}
 
 			Path errorFilepath = tempFilepathResolve(tempDirectory).resolve(errorLogFilename);
 			Path filesDir = tempFilepathResolve(tempDirectory);
@@ -1054,7 +1129,7 @@ int a = 1/0;
 							.forEach(File::delete);
 				}
 			} catch (Throwable ignored) {
-				System.err.println("[LoggingExtension] Could not clean source folder: " + ignored.getMessage());
+				// Silently continue
 			}
 
 			Files.createDirectories(errorFilepath.getParent());
@@ -1065,8 +1140,7 @@ int a = 1/0;
 			try {
 				untarLogs(filesDir, tarPath);
 			} catch (Throwable t) {
-				System.err.println("[LoggingExtension] Could not untar existing logs: " + t.getMessage());
-				// Continue anyway - we still want to save what we can
+				// Silently continue - we still want to save what we can
 			}
 
 			Files.write(
@@ -1078,9 +1152,49 @@ int a = 1/0;
 
 			atomicallySaveTempFiles();
 		} catch (Throwable T) {
-			// Last resort - at least print it
-			System.err.println("[LoggingExtension] FATAL: Could not save error log: " + T.getMessage());
-			T.printStackTrace(System.err);
+			// Fail silently - no stderr output
+		}
+	}
+
+	// Logs why the logger is shutting down/skipping, then saves to tar
+	// Only logs once to avoid duplicate messages
+	private void logShutdownReason(String reason) {
+		if (loggedShutdownReason) {
+			return;
+		}
+		loggedShutdownReason = true;
+
+		try {
+			// Ensure tempDirectory exists
+			if (tempDirectory == null) {
+				initTempDirectory();
+			}
+
+			Path errorFilepath = tempFilepathResolve(tempDirectory).resolve(errorLogFilename);
+			Path filesDir = tempFilepathResolve(tempDirectory);
+			Path tarPath = filepathResolve().resolve(finalTarFilename);
+
+			Files.createDirectories(errorFilepath.getParent());
+			Files.createDirectories(filesDir);
+
+			// Try to untar existing logs to preserve history
+			try {
+				untarLogs(filesDir, tarPath);
+			} catch (Throwable ignored) {
+				// Continue anyway
+			}
+
+			String message = "SHUTDOWN - " + LocalTime.now() + ": " + reason + "\n";
+			Files.write(
+					errorFilepath,
+					List.of(message),
+					StandardOpenOption.CREATE,
+					StandardOpenOption.APPEND
+			);
+
+			atomicallySaveTempFiles();
+		} catch (Throwable ignored) {
+			// Fail silently
 		}
 	}
 }
