@@ -1048,23 +1048,31 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	//================================================================================
 
 	private String generateMessage(Throwable throwable) {
+		// Build stack trace (truncated for readability)
 		StringBuilder stackStringBuilder = new StringBuilder();
-
 		int messageLength = 0;
 		int messageLengthLimit = 256;
-		for (StackTraceElement ste:throwable.getStackTrace()) {
+		for (StackTraceElement ste : throwable.getStackTrace()) {
 			String steMessage = ste.toString();
-
 			if ((steMessage != null && steMessage.length() > 0)
 					&& messageLength < messageLengthLimit) {
-				stackStringBuilder.append(steMessage);
-				stackStringBuilder.append("\n");
-
-				messageLength += steMessage.length()+1;
+				stackStringBuilder.append("    at ").append(steMessage).append("\n");
+				messageLength += steMessage.length() + 1;
 			}
 		}
 
-		// Safely get values that may not be initialized yet
+		// Determine operation context for error categorization
+		String operation = "initialization";
+		for (StackTraceElement ste : throwable.getStackTrace()) {
+			String method = ste.getMethodName();
+			if (method != null && ste.getClassName().contains("LoggingExtension")) {
+				// Use the first LoggingExtension method as the operation name
+				operation = method;
+				break;
+			}
+		}
+
+		// Safely get context values that may not be initialized yet
 		String runNum = "?";
 		String pkgName = "?";
 		String fileName = "?";
@@ -1080,19 +1088,17 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 			if (file != null) fileName = file;
 		} catch (Throwable ignored) {}
 
-		return "Message "
-				+ runNum
-				+" - "
-				+ LocalTime.now()
-				+ ": "
-				+ pkgName
-				+" "
-				+ fileName
-				+ "\n"
-				+ throwable.getMessage()
-				+ "\n"
-				+ stackStringBuilder.toString()
-				+ "\n";
+		// Format: ERROR in <operation>: <ExceptionClass>: <message>
+		// This format is parseable by analyze_errors.sh
+		String exceptionType = throwable.getClass().getName();
+		String message = throwable.getMessage();
+		if (message == null) {
+			message = "(no message)";
+		}
+
+		return "ERROR in " + operation + ": " + exceptionType + ": " + message + "\n"
+				+ "  Run: " + runNum + " at " + LocalTime.now() + " [" + pkgName + " " + fileName + "]\n"
+				+ stackStringBuilder.toString();
 	}
 
 	// Essentially makes a last-ditch effort to log the error
