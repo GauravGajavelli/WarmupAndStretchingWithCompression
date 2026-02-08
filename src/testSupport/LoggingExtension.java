@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -48,7 +49,12 @@ import com.github.difflib.algorithm.DiffException;
 import com.github.difflib.patch.AbstractDelta;
 import com.github.difflib.patch.Patch;
 
-public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeEachCallback {
+public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeEachCallback,
+		ExtensionContext.Store.CloseableResource {
+
+	// Namespace for storing this extension in JUnit's ExtensionContext
+	private static final ExtensionContext.Namespace NAMESPACE =
+			ExtensionContext.Namespace.create(LoggingExtension.class);
 
 	//================================================================================
 	// Fields
@@ -59,6 +65,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	static private Path tempDirectory;
 	static private Map<Path, List<String>> inMemoryBaselines;  // Source files captured at test start time
 	static private Map<Path, String> inMemoryBaselineBytes;  // new String(Files.readAllBytes(file))
+	static private boolean currentTestIsSpeedTest = false;  // Skip timing for @SpeedTest methods
 
 	final static String testRunInfoFilename = "testRunInfo.json";
 	final static String startTestRunInfoFilename  = "startTestRunInfo.json";
@@ -92,7 +99,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	public void beforeAll(ExtensionContext ctx) {
 		try {
 			LoggingSingleton.restartTiming();
-
+int a = 1/0;
 			if ((getRepoFilesSize() > MAX_REPO_SIZE) || tarTooBig()) {
 				return;
 			}
@@ -109,7 +116,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 						.resolve(testRunInfoFilename).toFile();
 				logger = LoggingSingleton.getInstance(testRunInfoFile);
 
-				Runtime.getRuntime().addShutdownHook(new Thread(this::close));
+				// Register with JUnit's lifecycle instead of JVM shutdown hook
+				// This ensures close() runs at the right time, before JVM shutdown begins
+				// The store will call close() when the root context is closed (after all tests)
+				ctx.getRoot().getStore(NAMESPACE).put("logger", this);
 
 				loggerInitialized = true;
 			}
@@ -129,6 +139,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
 	public void beforeEach(ExtensionContext ctx) {
 		try {
+			// Check if this test method has the @SpeedTest annotation
+			Method testMethod = ctx.getTestMethod().orElse(null);
+			currentTestIsSpeedTest = (testMethod != null && testMethod.isAnnotationPresent(SpeedTest.class));
+
 			setUpAndCheckTiming(SYNC_MAX_TIME);
 
 			if (LoggingSingleton.getSkipLogging() || LoggingSingleton.tooManyStrikes()) {
@@ -218,9 +232,11 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 	// Final method run
 	public void close() {
+		// Track errors but continue processing - don't let one failure kill everything
+		List<String> errors = new ArrayList<>();
+
 		try {
 			setUpAndCheckTiming(ASYNC_MAX_TIME);
-//			Thread.sleep(10000);
 			if (LoggingSingleton.getSkipLogging()) {
 				return;
 			} else if (LoggingSingleton.tooManyStrikes()) {
@@ -231,37 +247,80 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 			int seed = logger.getSeed();
 			boolean redactDiffs = logger.getRedactDiffs();
 
-			unzipAndUntarDiffs();
-			writeDiffs(currentTestRunNumber, seed, redactDiffs);
-			tarAndZipDiffs();
+			// Each operation is independent - failures don't cascade
+			errors.addAll(safeExecute("unzipAndUntarDiffs", () -> unzipAndUntarDiffs()));
+			errors.addAll(safeExecute("writeDiffs", () -> writeDiffs(currentTestRunNumber, seed, redactDiffs)));
+			errors.addAll(safeExecute("tarAndZipDiffs", () -> tarAndZipDiffs()));
+			errors.addAll(safeExecute("addPriorRebaslinedDiffs", () -> addPriorRebaslinedDiffs()));
 
-			// Copies over unchanged prior baselined diffs
-			addPriorRebaslinedDiffs();
+			// Copy error logs - use copy instead of move for safety
+			errors.addAll(safeExecute("copyErrorLogs", () -> {
+				Path oldErrorLogsFilePath = filepathResolve(tempDirectory).resolve(errorLogFilename);
+				Path newErrorLogsFilePath = tempFilepathResolve(tempDirectory).resolve(errorLogFilename);
+				if (Files.exists(oldErrorLogsFilePath)) {
+					Files.copy(oldErrorLogsFilePath, newErrorLogsFilePath,
+							StandardCopyOption.REPLACE_EXISTING);
+				} else {
+					Files.createDirectories(newErrorLogsFilePath.getParent());
+					Files.createFile(newErrorLogsFilePath);
+				}
+			}));
 
-			// Copies over unchanged error logs
-			Path oldErrorLogsFilePath = filepathResolve(tempDirectory).resolve(errorLogFilename);
-			Path newErrorLogsFilePath = tempFilepathResolve(tempDirectory).resolve(errorLogFilename);
-			Files.move(oldErrorLogsFilePath,newErrorLogsFilePath,
-					StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+			accumulateAndCheckTiming(ASYNC_MAX_TIME);
 
-			accumulateAndCheckTiming(ASYNC_MAX_TIME); // not timing
+			// Always try to save whatever we have
+			errors.addAll(safeExecute("saveTestRunInfo", () ->
+					saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo())));
 
-			saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo());
-			atomicallySaveTempFiles();
+			// Write any accumulated errors to the error log before final save
+			if (!errors.isEmpty()) {
+				Path errorFilepath = tempFilepathResolve(tempDirectory).resolve(errorLogFilename);
+				Files.write(errorFilepath, errors, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+			}
 
-			/* Any failure beyond this point will not be error logged properly due to the
-			 * files already being saved */
+			errors.addAll(safeExecute("atomicallySaveTempFiles", () -> atomicallySaveTempFiles()));
 
-			// Delete intermediates
-			Files.walk(tempDirectory)
-					.sorted(Comparator.reverseOrder())
-					.map(Path::toFile)
-					.forEach(File::delete);
+			// Delete intermediates - failure here is non-critical
+			safeExecute("cleanup", () -> {
+				Files.walk(tempDirectory)
+						.sorted(Comparator.reverseOrder())
+						.map(Path::toFile)
+						.forEach(File::delete);
+			});
 
-			// Timing check above saving test run info; otherwise strikes won't be updated
 		} catch (Throwable T) {
-			logError(T);
+			// Last resort - try to save whatever we can
+			try {
+				Path errorFilepath = tempFilepathResolve(tempDirectory).resolve(errorLogFilename);
+				Files.createDirectories(errorFilepath.getParent());
+				errors.add("FATAL: " + T.getClass().getName() + ": " + T.getMessage());
+				Files.write(errorFilepath, errors, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+				saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo());
+				atomicallySaveTempFiles();
+			} catch (Throwable ignored) {
+				// Absolute last resort - print to stderr so it's not completely silent
+				System.err.println("LOGGER FATAL ERROR: " + T.getMessage());
+				T.printStackTrace();
+			}
 		}
+	}
+
+	@FunctionalInterface
+	private interface ThrowingRunnable {
+		void run() throws Exception;
+	}
+
+	private List<String> safeExecute(String operationName, ThrowingRunnable operation) {
+		List<String> errors = new ArrayList<>();
+		try {
+			operation.run();
+		} catch (Throwable t) {
+			String error = "ERROR in " + operationName + ": " + t.getClass().getName() + ": " + t.getMessage();
+			errors.add(error);
+			// Also print to stderr for visibility during development
+			System.err.println("[LoggingExtension] " + error);
+		}
+		return errors;
 	}
 
 
@@ -421,11 +480,18 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	}
 
 	private void accumulateAndCheckTiming(long time) {
-		LoggingSingleton.accumulateTime();
+		// Skip accumulation for speed tests so their runtime doesn't affect other tests
+		if (!currentTestIsSpeedTest) {
+			LoggingSingleton.accumulateTime();
+		}
 		checkTiming(time);
 	}
 
 	private void checkTiming(long time) {
+		// Skip timing checks for speed tests
+		if (currentTestIsSpeedTest) {
+			return;
+		}
 		long timeElapsed = LoggingSingleton.getCurrentTotalElapsedTime();
 
 		if (timeElapsed > time) {
@@ -958,32 +1024,51 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	}
 
 	// Essentially makes a last-ditch effort to log the error
+	// Now with defensive error handling - never silently fails
 	private void logError(Throwable throwable) {
+		// Always print to stderr so errors are visible
+		System.err.println("[LoggingExtension] Error caught: " + throwable.getClass().getName() + ": " + throwable.getMessage());
+		throwable.printStackTrace(System.err);
+
 		try {
-			LoggingSingleton.accumulateTime(); // all publics throwing this will have already started time
+			LoggingSingleton.accumulateTime();
 
 			String message = generateMessage(throwable);
 			if (LoggingSingleton.getLoggedInitialError()) {
 				return;
 			}
 			LoggingSingleton.setLoggedInitialError();
-			LoggingSingleton.setSkipLogging(true);
+			// Don't set skipLogging=true anymore - let the logger continue trying
+			// LoggingSingleton.setSkipLogging(true);
 
 			Path errorFilepath = tempFilepathResolve(tempDirectory).resolve(errorLogFilename);
 			Path filesDir = tempFilepathResolve(tempDirectory);
 			Path tarPath = filepathResolve().resolve(finalTarFilename);
 
-
-			Files.walk(tempDirectory.resolve(sourceFolderName))
-					.sorted(Comparator.reverseOrder())
-					.map(Path::toFile)
-					.forEach(File::delete);
+			// Safely try to clean up source folder
+			try {
+				if (Files.exists(tempDirectory.resolve(sourceFolderName))) {
+					Files.walk(tempDirectory.resolve(sourceFolderName))
+							.sorted(Comparator.reverseOrder())
+							.map(Path::toFile)
+							.forEach(File::delete);
+				}
+			} catch (Throwable ignored) {
+				System.err.println("[LoggingExtension] Could not clean source folder: " + ignored.getMessage());
+			}
 
 			Files.createDirectories(errorFilepath.getParent());
 			Files.createDirectories(filesDir);
 			Files.createDirectories(tarPath.getParent());
 
-			untarLogs(filesDir, tarPath);
+			// Safely try to untar existing logs
+			try {
+				untarLogs(filesDir, tarPath);
+			} catch (Throwable t) {
+				System.err.println("[LoggingExtension] Could not untar existing logs: " + t.getMessage());
+				// Continue anyway - we still want to save what we can
+			}
+
 			Files.write(
 					errorFilepath,
 					List.of(message),
@@ -993,7 +1078,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 			atomicallySaveTempFiles();
 		} catch (Throwable T) {
-			// Do nothing
+			// Last resort - at least print it
+			System.err.println("[LoggingExtension] FATAL: Could not save error log: " + T.getMessage());
+			T.printStackTrace(System.err);
 		}
 	}
 }
