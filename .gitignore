@@ -6,3 +6,4 @@ temp/
 diffs.tar.zip
 testRunInfo.json
 run/
+run.tar.bak.*

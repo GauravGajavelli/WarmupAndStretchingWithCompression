@@ -21,6 +21,7 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.time.LocalTime;
@@ -72,6 +73,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	final static String startTestRunInfoFilename  = "startTestRunInfo.json";
 	final static String errorLogFilename = "error-logs.txt";
 	final static String finalTarFilename = "run.tar";
+	final static String backupTarPrefix = "run.tar.bak.";  // followed by run numbers separated by -
 	final static String diffsPrefix = "diffs";
 	final static String tarSuffix = ".tar";
 	final static String tarZipSuffix = ".tar.zip";
@@ -341,10 +343,12 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 			// Delete intermediates - failure here is non-critical
 			safeExecute("cleanup", () -> {
-				Files.walk(tempDirectory)
+				try (var walkStream = Files.walk(tempDirectory)) {
+					walkStream
 						.sorted(Comparator.reverseOrder())
 						.map(Path::toFile)
 						.forEach(File::delete);
+				}
 			});
 
 		} catch (Throwable T) {
@@ -394,8 +398,46 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 			Files.createDirectories(tempFilepathResolve(tempDirectory));
 			Path filesDir = filepathResolve(tempDirectory);
 			Path tarPath  = filepathResolve().resolve(finalTarFilename);
+			Path tempTarPath = filepathResolve().resolve(finalTarFilename + ".tmp");
+
+			// Clean up any interrupted temp file
+			Files.deleteIfExists(tempTarPath);
+
+			// Variables for recovery tracking (used after untarLogs)
+			List<Integer> lostRuns = null;
+			int maxLostRun = -1;
+
+			// Check for backup file (indicates interrupted save)
+			Path backupPath = findBackupFile();
+			if (backupPath != null) {
+				lostRuns = parseBackupRunNumbers(backupPath);
+				maxLostRun = lostRuns.stream().mapToInt(Integer::intValue).max().orElse(-1);
+
+				if (Files.notExists(tarPath)) {
+					// Main tar missing - COPY from backup (keep backup for run number tracking)
+					Files.copy(backupPath, tarPath, StandardCopyOption.REPLACE_EXISTING);
+
+					// Log recovery with all interrupted run numbers
+					Path errorLogPath = filepathResolve(tempDirectory).resolve(errorLogFilename);
+					Files.createDirectories(errorLogPath.getParent());
+					String msg = "RECOVERED: " + formatInterruptedRuns(lostRuns)
+						+ " interrupted at " + LocalTime.now();
+					Files.write(errorLogPath, List.of(msg),
+						StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+				}
+				// If tar exists, keep backup anyway - it tracks prior failed run numbers
+				// The backup will be extended in atomicallySaveTempFiles() and deleted on success
+			}
 
 			untarLogs(filesDir, tarPath);
+
+			// After untarring, update prevRunNumber to skip interrupted runs
+			if (lostRuns != null && maxLostRun > 0) {
+				Path testRunInfoPath = filepathResolve(tempDirectory).resolve(testRunInfoFilename);
+				if (Files.exists(testRunInfoPath)) {
+					updatePrevRunNumber(testRunInfoPath, maxLostRun);
+				}
+			}
 			Path testRunInfoPath = filepathResolve(tempDirectory).resolve(testRunInfoFilename);
 			Path errorLogFilePath = filepathResolve(tempDirectory).resolve(errorLogFilename);
 			if (Files.notExists(errorLogFilePath)) {
@@ -582,6 +624,50 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 	private Path filepathResolve() {
 		return Paths.get(sourceFolderName,testSupportPackageName);
+	}
+
+	private Path findBackupFile() throws IOException {
+		Path testSupportDir = filepathResolve();
+		if (Files.notExists(testSupportDir)) {
+			return null;
+		}
+		try (var stream = Files.list(testSupportDir)) {
+			return stream
+				.filter(p -> p.getFileName().toString().startsWith(backupTarPrefix))
+				.findFirst()
+				.orElse(null);
+		}
+	}
+
+	private List<Integer> parseBackupRunNumbers(Path backupPath) {
+		List<Integer> runs = new ArrayList<>();
+		String filename = backupPath.getFileName().toString();
+		String numPart = filename.substring(backupTarPrefix.length());
+		for (String s : numPart.split("-")) {
+			try {
+				runs.add(Integer.parseInt(s));
+			} catch (NumberFormatException e) {
+				// Skip unparseable parts
+			}
+		}
+		return runs;
+	}
+
+	private String formatInterruptedRuns(List<Integer> runs) {
+		if (runs.isEmpty()) return "unknown runs";
+		if (runs.size() == 1) return "run #" + runs.get(0);
+		int first = runs.get(0);
+		int last = runs.get(runs.size() - 1);
+		return "runs #" + first + "-" + last;
+	}
+
+	private void updatePrevRunNumber(Path testRunInfoPath, int newPrevRunNumber) throws IOException {
+		// Read, modify, write testRunInfo.json to skip interrupted run numbers
+		ObjectMapper mapper = new ObjectMapper();
+		JsonNode root = mapper.readTree(testRunInfoPath.toFile());
+		((com.fasterxml.jackson.databind.node.ObjectNode) root)
+			.put("prevRunNumber", newPrevRunNumber);
+		mapper.writerWithDefaultPrettyPrinter().writeValue(testRunInfoPath.toFile(), root);
 	}
 
 	private List<String> readContents(Path path) throws IOException {
@@ -903,8 +989,13 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 							!fileName.equals(getDiffsTarZipFilename())) { // any prior
 						Path newPriorRebaslinedDiffPath = tempFilepathResolve(tempDirectory)
 								.resolve(fileName);
-						Files.move(p,newPriorRebaslinedDiffPath,
-								StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+						try {
+							Files.move(p, newPriorRebaslinedDiffPath,
+									StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+						} catch (AtomicMoveNotSupportedException e) {
+							Files.copy(p, newPriorRebaslinedDiffPath, StandardCopyOption.REPLACE_EXISTING);
+							Files.delete(p);
+						}
 
 					}
 					return FileVisitResult.CONTINUE;
@@ -960,9 +1051,54 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 				}
 			}
 
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 
-			Files.move(tempTargetTar,targetTar,
-					StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+		// Step 1: Create or extend backup with current run number
+		try {
+			int currentRunNumber = LoggingSingleton.getCurrentTestRunNumber();
+			Path existingBackup = findBackupFile();
+			Path backupPath;
+
+			if (existingBackup != null) {
+				// Use range format: first failed run to current run
+				// e.g., run.tar.bak.42 -> run.tar.bak.42-43
+				// e.g., run.tar.bak.42-43 -> run.tar.bak.42-44 (not 42-43-44)
+				List<Integer> priorRuns = parseBackupRunNumbers(existingBackup);
+				int firstRun = priorRuns.get(0);
+				String newName = backupTarPrefix + firstRun + "-" + currentRunNumber;
+				backupPath = existingBackup.resolveSibling(newName);
+				try {
+					Files.move(existingBackup, backupPath,
+							StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+				} catch (AtomicMoveNotSupportedException e) {
+					// Windows cross-filesystem fallback
+					Files.copy(existingBackup, backupPath, StandardCopyOption.REPLACE_EXISTING);
+					Files.delete(existingBackup);
+				}
+			} else if (Files.exists(targetTar)) {
+				// First backup - copy existing tar
+				backupPath = filepathResolve().resolve(backupTarPrefix + currentRunNumber);
+				Files.copy(targetTar, backupPath, StandardCopyOption.REPLACE_EXISTING);
+			} else {
+				backupPath = null;  // No existing tar to backup
+			}
+
+			// Step 2: Write new tar (with atomic fallback for Windows)
+			try {
+				Files.move(tempTargetTar, targetTar,
+						StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+			} catch (AtomicMoveNotSupportedException e) {
+				// Windows cross-filesystem fallback
+				Files.copy(tempTargetTar, targetTar, StandardCopyOption.REPLACE_EXISTING);
+				Files.delete(tempTargetTar);
+			}
+
+			// Step 3: Delete backup (save complete - all prior failures now succeeded)
+			if (backupPath != null) {
+				Files.deleteIfExists(backupPath);
+			}
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
@@ -1025,7 +1161,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 			tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
 
-			Files.walk(diffsDir)
+			try (var walkStream = Files.walk(diffsDir)) {
+				walkStream
 					.filter(Files::isRegularFile)
 					.forEach(p -> {
 						try {
@@ -1038,6 +1175,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 							throw new UncheckedIOException(ex);
 						}
 					});
+			}
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
