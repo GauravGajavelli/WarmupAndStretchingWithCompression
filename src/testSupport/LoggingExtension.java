@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -32,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -66,7 +66,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	static private Path tempDirectory;
 	static private Map<Path, List<String>> inMemoryBaselines;  // Source files captured at test start time
 	static private Map<Path, String> inMemoryBaselineBytes;  // new String(Files.readAllBytes(file))
-	static private boolean currentTestIsSpeedTest = false;  // Skip timing for @SpeedTest methods
 	static private boolean loggedShutdownReason = false;  // Ensures shutdown reason is logged only once
 
 	final static String testRunInfoFilename = "testRunInfo.json";
@@ -121,6 +120,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 			}
 
 			if (!loggerInitialized) {
+				long initStart = System.nanoTime();
 
 				initDirectories();
 
@@ -138,6 +138,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 				ctx.getRoot().getStore(NAMESPACE).put("logger", this);
 
 				loggerInitialized = true;
+				LoggingSingleton.setBeforeAllInitDurationMs(
+						TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - initStart));
 			}
 
 			Class<?> testClass = ctx.getTestClass().orElseThrow();
@@ -155,9 +157,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
 	public void beforeEach(ExtensionContext ctx) {
 		try {
-			// Check if this test method has the @SpeedTest annotation
-			Method testMethod = ctx.getTestMethod().orElse(null);
-			currentTestIsSpeedTest = (testMethod != null && testMethod.isAnnotationPresent(SpeedTest.class));
+			LoggingSingleton.resetAccumulatedTime();
 
 			setUpAndCheckTiming(SYNC_MAX_TIME);
 
@@ -283,6 +283,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 	// Final method run
 	public void close() {
+		long closeStart = System.nanoTime();
 		// Track errors but continue processing - don't let one failure kill everything
 		List<String> errors = new ArrayList<>();
 
@@ -301,13 +302,13 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 			boolean redactDiffs = logger.getRedactDiffs();
 
 			// Each operation is independent - failures don't cascade
-			errors.addAll(safeExecute("unzipAndUntarDiffs", () -> unzipAndUntarDiffs()));
-			errors.addAll(safeExecute("writeDiffs", () -> writeDiffs(currentTestRunNumber, seed, redactDiffs)));
-			errors.addAll(safeExecute("tarAndZipDiffs", () -> tarAndZipDiffs()));
-			errors.addAll(safeExecute("addPriorRebaslinedDiffs", () -> addPriorRebaslinedDiffs()));
+			errors.addAll(timedSafeExecute("unzipAndUntarDiffs", () -> unzipAndUntarDiffs()));
+			errors.addAll(timedSafeExecute("writeDiffs", () -> writeDiffs(currentTestRunNumber, seed, redactDiffs)));
+			errors.addAll(timedSafeExecute("tarAndZipDiffs", () -> tarAndZipDiffs()));
+			errors.addAll(timedSafeExecute("addPriorRebaslinedDiffs", () -> addPriorRebaslinedDiffs()));
 
 			// Copy error logs - use copy instead of move for safety
-			errors.addAll(safeExecute("copyErrorLogs", () -> {
+			errors.addAll(timedSafeExecute("copyErrorLogs", () -> {
 				Path oldErrorLogsFilePath = filepathResolve(tempDirectory).resolve(errorLogFilename);
 				Path newErrorLogsFilePath = tempFilepathResolve(tempDirectory).resolve(errorLogFilename);
 				if (Files.exists(oldErrorLogsFilePath)) {
@@ -320,10 +321,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 			}));
 
 			accumulateAndCheckTiming(ASYNC_MAX_TIME);
-
-			// Always try to save whatever we have
-			errors.addAll(safeExecute("saveTestRunInfo", () ->
-					saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo())));
 
 			// Write any accumulated errors to the error log before final save
 			if (!errors.isEmpty()) {
@@ -338,6 +335,13 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 				Files.write(errorFilepath, List.of(String.valueOf(currentTestRunNumber)),
 						StandardOpenOption.CREATE, StandardOpenOption.APPEND);
 			}
+
+			// Record close duration before saving testRunInfo so it appears in the tar
+			long closeDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - closeStart);
+			LoggingSingleton.setCloseDurationMs(closeDurationMs);
+
+			errors.addAll(safeExecute("saveTestRunInfo", () ->
+					saveTestRunInfo(logger.getObjectMapper(), logger.getTestRunInfo())));
 
 			errors.addAll(safeExecute("atomicallySaveTempFiles", () -> atomicallySaveTempFiles()));
 
@@ -379,6 +383,16 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 			String error = "ERROR in " + operationName + ": " + t.getClass().getName() + ": " + t.getMessage();
 			errors.add(error);
 		}
+		return errors;
+	}
+
+	private List<String> timedSafeExecute(String operationName, ThrowingRunnable operation) {
+		long opStart = System.nanoTime();
+		List<String> errors = safeExecute(operationName, operation);
+		long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - opStart);
+		try {
+			LoggingSingleton.addCloseTiming(operationName, durationMs);
+		} catch (Throwable ignored) {}
 		return errors;
 	}
 
@@ -577,18 +591,11 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	}
 
 	private void accumulateAndCheckTiming(long time) {
-		// Skip accumulation for speed tests so their runtime doesn't affect other tests
-		if (!currentTestIsSpeedTest) {
-			LoggingSingleton.accumulateTime();
-		}
+		LoggingSingleton.accumulateTime();
 		checkTiming(time);
 	}
 
 	private void checkTiming(long time) {
-		// Skip timing checks for speed tests
-		if (currentTestIsSpeedTest) {
-			return;
-		}
 		long timeElapsed = LoggingSingleton.getCurrentTotalElapsedTime();
 
 		if (timeElapsed > time) {

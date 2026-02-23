@@ -256,6 +256,29 @@ class LoggingSingleton {
     	LoggingSingleton.startTime = System.nanoTime();
     }
 
+    static void resetAccumulatedTime() {
+    	LoggingSingleton.accumulatedTime = 0;
+    }
+
+    static void setCloseDurationMs(long ms) {
+    	ObjectNode node = (ObjectNode) LoggingSingleton.testRunInfo;
+    	node.put("closeDurationMs", ms);
+    	LoggingSingleton.testRunInfo = (JsonNode) node;
+    }
+
+    static void setBeforeAllInitDurationMs(long ms) {
+    	ObjectNode node = (ObjectNode) LoggingSingleton.testRunInfo;
+    	node.put("beforeAllInitDurationMs", ms);
+    	LoggingSingleton.testRunInfo = (JsonNode) node;
+    }
+
+    static void addCloseTiming(String operation, long ms) {
+    	ObjectNode node = (ObjectNode) LoggingSingleton.testRunInfo;
+    	ObjectNode timingNode = getOrCreateObjectNode(node, "closeTiming");
+    	timingNode.put(operation, ms);
+    	LoggingSingleton.testRunInfo = (JsonNode) node;
+    }
+
     static void accumulateTime() {
     	if (LoggingSingleton.startTime == null) {
     		throw new Error("Cannot accumulate time; never started timing");
