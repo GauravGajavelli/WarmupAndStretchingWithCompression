@@ -50,23 +50,22 @@ import com.github.difflib.algorithm.DiffException;
 import com.github.difflib.patch.AbstractDelta;
 import com.github.difflib.patch.Patch;
 
-public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeEachCallback,
-		ExtensionContext.Store.CloseableResource {
-
-	// Namespace for storing this extension in JUnit's ExtensionContext
-	private static final ExtensionContext.Namespace NAMESPACE =
-			ExtensionContext.Namespace.create(LoggingExtension.class);
+public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeEachCallback {
 
 	//================================================================================
 	// Fields
 	//================================================================================
 
-	private LoggingSingleton logger;
+	static private LoggingSingleton logger;
 	static private boolean loggerInitialized = false;
 	static private Path tempDirectory;
 	static private Map<Path, List<String>> inMemoryBaselines;  // Source files captured at test start time
 	static private Map<Path, String> inMemoryBaselineBytes;  // new String(Files.readAllBytes(file))
 	static private boolean loggedShutdownReason = false;  // Ensures shutdown reason is logged only once
+	static LoggingExtension instance;                      // accessed by LoggingSessionListener
+	static boolean launcherSessionListenerFired = false;   // used by shutdown hook fallback
+	static private Long cachedRepoSize = null;     // repo size, stable for the entire JVM run
+	static private Boolean cachedTarTooBig = null; // tar size check, stable for the entire JVM run
 
 	final static String testRunInfoFilename = "testRunInfo.json";
 	final static String startTestRunInfoFilename  = "startTestRunInfo.json";
@@ -85,8 +84,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 	private final long MB_SIZE = 1024 * 1024;   // 1 MB
 	private final long KB_SIZE = 1024;   // 1 KB
-	private final long SYNC_MAX_TIME = 500; // in ms
-	private final long ASYNC_MAX_TIME = 3000; // in ms
+	private final long SYNC_MAX_TIME = 500;        // in ms — per-test callback overhead
+	private final long BEFORE_ALL_MAX_TIME = 2000; // in ms — filesystem I/O in beforeAll()
+	private final long ASYNC_MAX_TIME = 3000;      // in ms — afterAll() I/O operations
 	private final long WAY_TOO_LONG_FACTOR = 3;
 	private final long REBASELINE_SIZE = 10L * KB_SIZE;
 	private final long MAX_TAR_SIZE = 2L * MB_SIZE;
@@ -100,6 +100,8 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	@Override
 	public void beforeAll(ExtensionContext ctx) {
 		try {
+			LoggingSingleton.resetAccumulatedTime();
+			long beforeAllStart = System.nanoTime();
 			LoggingSingleton.restartTiming();
 
 			// Initialize tempDirectory early so logError() can work if exceptions occur
@@ -132,12 +134,25 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 						.resolve(testRunInfoFilename).toFile();
 				logger = LoggingSingleton.getInstance(testRunInfoFile);
 
-				// Register with JUnit's lifecycle instead of JVM shutdown hook
-				// This ensures close() runs at the right time, before JVM shutdown begins
-				// The store will call close() when the root context is closed (after all tests)
-				ctx.getRoot().getStore(NAMESPACE).put("logger", this);
-
 				loggerInitialized = true;
+				instance = this;
+				// Cleanup-only hook: safe to kill mid-deletion (temp dir leaks at worst)
+				Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+					try {
+						if (!launcherSessionListenerFired && instance != null) {
+							instance.doSessionFlush();  // fallback if SPI not discovered
+						}
+					} catch (Throwable ignored) {}
+					try {
+						if (tempDirectory != null) {
+							try (var walkStream = Files.walk(tempDirectory)) {
+								walkStream.sorted(Comparator.reverseOrder())
+										  .map(Path::toFile)
+										  .forEach(File::delete);
+							}
+						}
+					} catch (Throwable ignored) {}
+				}));
 				LoggingSingleton.setBeforeAllInitDurationMs(
 						TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - initStart));
 			}
@@ -148,7 +163,9 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 			LoggingSingleton.setCurrentTestFilePath(testFileName, packageName);
 
-			accumulateAndCheckTiming(SYNC_MAX_TIME);
+			LoggingSingleton.setBeforeAllTotalDurationMs(
+					TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - beforeAllStart));
+			accumulateAndCheckTiming(BEFORE_ALL_MAX_TIME);
 		} catch (Throwable T) {
 			logError(T);
 		}
@@ -281,8 +298,7 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 		}
 	}
 
-	// Final method run
-	public void close() {
+	void doSessionFlush() {
 		long closeStart = System.nanoTime();
 		// Track errors but continue processing - don't let one failure kill everything
 		List<String> errors = new ArrayList<>();
@@ -290,10 +306,10 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 		try {
 			setUpAndCheckTiming(ASYNC_MAX_TIME);
 			if (LoggingSingleton.getSkipLogging()) {
-				logShutdownReason("skipLogging flag is set (in close)");
+				logShutdownReason("skipLogging flag is set (in launcherSessionClosed)");
 				return;
 			} else if (LoggingSingleton.tooManyStrikes()) {
-				logShutdownReason("Too many timing strikes accumulated (in close)");
+				logShutdownReason("Too many timing strikes accumulated (in launcherSessionClosed)");
 				LoggingSingleton.setSkipLogging(true);
 			}
 
@@ -345,15 +361,6 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 
 			errors.addAll(safeExecute("atomicallySaveTempFiles", () -> atomicallySaveTempFiles()));
 
-			// Delete intermediates - failure here is non-critical
-			safeExecute("cleanup", () -> {
-				try (var walkStream = Files.walk(tempDirectory)) {
-					walkStream
-						.sorted(Comparator.reverseOrder())
-						.map(Path::toFile)
-						.forEach(File::delete);
-				}
-			});
 
 		} catch (Throwable T) {
 			// Last resort - try to save whatever we can
@@ -568,13 +575,19 @@ public class LoggingExtension implements TestWatcher, BeforeAllCallback, BeforeE
 	//================================================================================
 
 	private boolean tarTooBig() throws IOException {
-		Path tarPath  = filepathResolve().resolve(finalTarFilename);
-		return fileLargerThan(tarPath, MAX_TAR_SIZE);
+		if (cachedTarTooBig == null) {
+			Path tarPath = filepathResolve().resolve(finalTarFilename);
+			cachedTarTooBig = fileLargerThan(tarPath, MAX_TAR_SIZE);
+		}
+		return cachedTarTooBig;
 	}
 
 	private long getRepoFilesSize() throws IOException {
-		Path sourceFolder = Paths.get(sourceFolderName); // traversing the actual src
-		return getFilesSize(sourceFolder);
+		if (cachedRepoSize == null) {
+			Path sourceFolder = Paths.get(sourceFolderName);
+			cachedRepoSize = getFilesSize(sourceFolder);
+		}
+		return cachedRepoSize;
 	}
 
 	private long getUncompressedDiffSize() throws IOException {

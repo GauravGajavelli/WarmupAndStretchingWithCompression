@@ -272,6 +272,12 @@ class LoggingSingleton {
     	LoggingSingleton.testRunInfo = (JsonNode) node;
     }
 
+    static void setBeforeAllTotalDurationMs(long ms) {
+    	ObjectNode node = (ObjectNode) LoggingSingleton.testRunInfo;
+    	node.put("beforeAllTotalDurationMs", ms);
+    	LoggingSingleton.testRunInfo = (JsonNode) node;
+    }
+
     static void addCloseTiming(String operation, long ms) {
     	ObjectNode node = (ObjectNode) LoggingSingleton.testRunInfo;
     	ObjectNode timingNode = getOrCreateObjectNode(node, "closeTiming");
@@ -283,7 +289,9 @@ class LoggingSingleton {
     	if (LoggingSingleton.startTime == null) {
     		throw new Error("Cannot accumulate time; never started timing");
     	}
-    	LoggingSingleton.accumulatedTime += System.nanoTime()-LoggingSingleton.startTime;
+    	long now = System.nanoTime();
+    	LoggingSingleton.accumulatedTime += now - LoggingSingleton.startTime;
+    	LoggingSingleton.startTime = now; // advance startTime so getCurrentTotalElapsedTime() doesn't re-add this interval
     }
 
     static void addStrike() {
